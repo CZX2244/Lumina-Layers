@@ -100,6 +100,7 @@ from api.routers import (
 )
 from core.workshop import WorkshopError
 from api.routers.projects import router as projects_router
+from api.routers.plus_storage import router as plus_storage_router
 
 log = get_logger(__name__)
 
@@ -683,6 +684,8 @@ def create_app() -> FastAPI:
     app.include_router(session_router)
     app.include_router(slicer_router)
     app.include_router(single_stage_router)
+    # Registered before system_router so /api/system/storage is not shadowed.
+    app.include_router(plus_storage_router)
     app.include_router(system_router)
     app.include_router(vectorizer_router)
     app.include_router(workshop_router)

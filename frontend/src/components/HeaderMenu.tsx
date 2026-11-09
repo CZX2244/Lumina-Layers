@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
+import { useStudioPrefsStore } from "../studio/studioPrefsStore";
 import { useI18n } from "../i18n/context";
 import { useOutsideInteraction } from "../hooks/useOutsideInteraction";
 import { BugReportButton } from "./BugReportButton";
@@ -79,6 +80,8 @@ function resolveTriggerAlert(
  */
 export function HeaderMenu({ backendStatus, reproTicketId, onReportBug, onOpenAbout }: HeaderMenuProps) {
   const { t } = useI18n();
+  const uiShell = useStudioPrefsStore((state) => state.shell);
+  const setUiShell = useStudioPrefsStore((state) => state.setShell);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -158,7 +161,13 @@ export function HeaderMenu({ backendStatus, reproTicketId, onReportBug, onOpenAb
         {open && (
           <HeaderMenuPanel id={panelId} onItemSelected={() => close(true)}>
             <ThemeToggle />
-            <TutorialLauncherButton />
+            {uiShell === "classic" && <TutorialLauncherButton />}
+            <HeaderMenuItem
+              label={t(uiShell === "studio" ? "studio.menu.to_classic" : "studio.menu.to_studio")}
+              onSelect={() => setUiShell(uiShell === "studio" ? "classic" : "studio")}
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">
+                <rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M9 4.5v15" />
+              </svg>} />
             {onOpenAbout && (
               <HeaderMenuItem label={t("desktop_menu_about")} onSelect={() => onOpenAbout(() => triggerRef.current?.focus({ preventScroll: true }))}
                 icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden="true">

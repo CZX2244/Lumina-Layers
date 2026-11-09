@@ -1,4 +1,4 @@
-export type SavePurpose = 'project' | 'share-card' | 'screenshot';
+export type SavePurpose = 'project' | 'share-card' | 'screenshot' | 'preset' | 'assembly';
 export type SaveOutcome = 'saved' | 'canceled' | 'download-started';
 export async function saveGeneratedFile(blob: Blob, filename: string, purpose: SavePurpose): Promise<SaveOutcome> {
   if (blob.size > 128 * 1024 * 1024) throw new Error('file_save_too_large');

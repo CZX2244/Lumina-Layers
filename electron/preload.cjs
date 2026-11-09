@@ -55,4 +55,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openGradientModel: (url) => ipcRenderer.invoke("open-gradient-model", url),
   pickWorkshopImage: () =>
     ipcRenderer.invoke("pick-workshop-image"),
+  // Lumina Studio Plus desktop helpers.
+  plus: {
+    showItemInFolder: (filePath) => ipcRenderer.invoke("plus-show-item-in-folder", filePath),
+    setDownloadNaming: (template, context) => ipcRenderer.send("plus-set-download-naming", { template, context }),
+    setTaskbarProgress: (state) => ipcRenderer.send("plus-set-taskbar-progress", state),
+    getConfig: () => ipcRenderer.invoke("plus-get-config"),
+    setConfig: (update) => ipcRenderer.invoke("plus-set-config", update),
+    relaunch: () => ipcRenderer.invoke("plus-relaunch"),
+    checkUpdate: () => ipcRenderer.invoke("plus-check-update"),
+    openRelease: (url) => ipcRenderer.invoke("plus-open-release", url),
+    onDownloadDone: (listener) => {
+      const forward = (_event, payload) => listener(payload);
+      ipcRenderer.on("plus-download-done", forward);
+      return () => ipcRenderer.removeListener("plus-download-done", forward);
+    },
+  },
 });

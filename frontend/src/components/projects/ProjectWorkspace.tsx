@@ -21,6 +21,7 @@ import EditorHistoryControls from "./EditorHistoryControls";
 import ProjectDeviceDialog from "./ProjectDeviceDialog";
 import { availableRecoveries } from "../../project/recentProjects";
 import { projectErrorMessage } from "../../project/errors";
+import { PROJECT_COMMAND_EVENT, type ProjectCommand } from "../../studio/projectCommands";
 
 type Choice = "save" | "discard" | "cancel";
 const DEV_RELOAD_ENTRY = "lumina-dev-reload-entry";
@@ -104,6 +105,32 @@ export default function ProjectWorkspace({ children, className = "px-4", style }
     setCreating(true);
     useProjectUi.setState({ centerOpen: true });
   }, []);
+  // Project actions requested by the studio shell (home page, command palette, drops).
+  // 新版工作台（首页、命令面板、拖放）发起的工程操作，同样经过未保存保护。
+  useEffect(() => {
+    const onCommand = (event: Event) => {
+      const command = (event as CustomEvent<ProjectCommand>).detail;
+      if (!command || busyRef.current) return;
+      switch (command.action) {
+        case "open": open(); break;
+        case "save": save(); break;
+        case "saveAs": saveAs(); break;
+        case "new": showNew(); break;
+        case "center": showCenter(); break;
+        case "export": perform(exportCurrentProject); break;
+        case "openEntry": {
+          const entry = useProjectUi.getState().entries.find((item) => item.fileEntryId === command.entryId);
+          if (entry) perform(async () => acceptFile(await openProjectEntry(entry)));
+          break;
+        }
+        case "openFile":
+          perform(async () => acceptFile({ bytes: new Uint8Array(await command.file.arrayBuffer()) }));
+          break;
+      }
+    };
+    window.addEventListener(PROJECT_COMMAND_EVENT, onCommand);
+    return () => window.removeEventListener(PROJECT_COMMAND_EVENT, onCommand);
+  }, [acceptFile, open, perform, save, saveAs, showCenter, showNew]);
   useApplicationMenuCommand("projectOpen", open, !busy);
   useApplicationMenuCommand("projectSave", save, !busy);
   useApplicationMenuCommand("projectSaveAs", saveAs, !busy);

@@ -3,7 +3,8 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { resolveDefaultSavePath } = require('./generated-file-directory.cjs');
 const MAX_GENERATED_FILE_BYTES = 128 * 1024 * 1024;
-const extensions = { project: '.lumina.json', 'share-card': '.png', screenshot: '.png' };
+const extensions = { project: '.lumina.json', 'share-card': '.png', screenshot: '.png', preset: '.json', assembly: '.png' };
+const JSON_PURPOSES = new Set(['project', 'preset']);
 
 async function saveGeneratedFile({ event, window, trustedUrl, payload, showSaveDialog, defaultDirectory = '', fileSystem = fs }) {
   const frame = event?.senderFrame;
@@ -21,7 +22,7 @@ async function saveGeneratedFile({ event, window, trustedUrl, payload, showSaveD
   }
   if (bytes.byteLength > MAX_GENERATED_FILE_BYTES) return { status: 'error', code: 'too-large' };
   try {
-    if (purpose === 'project') {
+    if (JSON_PURPOSES.has(purpose)) {
       JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     } else if (![137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value)) {
       return { status: 'error', code: 'invalid' };
@@ -30,9 +31,9 @@ async function saveGeneratedFile({ event, window, trustedUrl, payload, showSaveD
   let temporaryPath;
   try {
     const choice = await showSaveDialog(window, { defaultPath: resolveDefaultSavePath(defaultDirectory, filename),
-      filters: [{ name: purpose === 'project' ? 'Lumina JSON' : 'PNG', extensions: [purpose === 'project' ? 'json' : 'png'] }] });
+      filters: [{ name: JSON_PURPOSES.has(purpose) ? 'Lumina JSON' : 'PNG', extensions: [JSON_PURPOSES.has(purpose) ? 'json' : 'png'] }] });
     if (choice.canceled || !choice.filePath) return { status: 'canceled' };
-    if (!choice.filePath.toLowerCase().endsWith(purpose === 'project' ? '.json' : extension)) return { status: 'error', code: 'invalid' };
+    if (!choice.filePath.toLowerCase().endsWith(JSON_PURPOSES.has(purpose) ? '.json' : extension)) return { status: 'error', code: 'invalid' };
     const candidatePath = path.join(path.dirname(choice.filePath), `.lumina-save-${randomUUID()}.tmp`);
     const handle = await fileSystem.open(candidatePath, 'wx', 0o600);
     temporaryPath = candidatePath;
@@ -42,7 +43,7 @@ async function saveGeneratedFile({ event, window, trustedUrl, payload, showSaveD
     } finally { await handle.close(); }
     await fileSystem.rename(temporaryPath, choice.filePath);
     temporaryPath = undefined;
-    return { status: 'saved' };
+    return { status: 'saved', filePath: choice.filePath };
   } catch (_) {
     return { status: 'error', code: 'write-failed' };
   } finally {

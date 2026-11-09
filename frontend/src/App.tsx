@@ -79,6 +79,8 @@ import {
 } from "./components/ui/headerControls";
 
 import LutDetailsPanel from "./components/LutDetailsPanel";
+import { StudioShell } from "./studio/StudioShell";
+import { useStudioPrefsStore } from "./studio/studioPrefsStore";
 
 const HEALTH_RECHECK_MS = 5_000;
 const AboutDialog = lazy(() => import("./credits/AboutDialog"));
@@ -251,6 +253,10 @@ function AppContent({ connected }: { connected: boolean | null }) {
   useConversionPreferences();
   const workspace = useWorkspaceMode();
   const reproMode = useReproMode();
+  // Lumina Studio Plus: the studio shell replaces the classic layout unless
+  // the user picks "classic"; bug-report reproduction keeps the classic one.
+  const uiShell = useStudioPrefsStore((s) => s.shell);
+  const studioShell = uiShell === "studio" && !reproMode.enabled;
   const headerNavAlignment = useSettingsStore((s) => s.headerNavAlignment);
   const mergedTitlebar = electronAPI?.platform === "darwin" || electronAPI?.platform === "win32";
   const headerRef = useRef<HTMLElement>(null);
@@ -442,6 +448,66 @@ function AppContent({ connected }: { connected: boolean | null }) {
     </AlignedNavStrip>
   );
 
+  const globalOverlays = (
+    <>
+      {infoPage && <Suspense fallback={<LoadingSpinner />}><AboutDialog page={infoPage} onNavigate={setInfoPage} onClose={closeAbout} /></Suspense>}
+      <AnnouncementDialog
+        open={!infoOpen && announcementReady && announcement.visible}
+        entries={announcement.entries}
+        entry={announcement.entry}
+        onClose={announcement.close}
+        onDismissVersion={announcement.dismissThisVersion}
+      />
+      <BugReportModal
+        open={bugReportOpen}
+        onClose={closeBugReport}
+        presetDescription={bugReportPreset}
+      />
+      {/* Ask whether to file a ticket after an unexpected error; hidden while
+          the report form is open and during bug-report reproduction runs. */}
+      <ErrorTicketPrompt
+        info={bugReportOpen || reproMode.enabled ? null : errorTicketPrompt}
+        onReport={() => {
+          if (errorTicketPrompt) {
+            openBugReport(buildErrorTicketDescription(errorTicketPrompt, t));
+          }
+        }}
+        onDismiss={dismissErrorTicketPrompt}
+        onSuppress={suppressErrorTicketPrompt}
+      />
+      {/* Beginner tutorial: offered once after the release announcement is
+          gone, and never during bug-report reproduction sessions. */}
+      <TutorialHost
+        canAutoOffer={!studioShell && !infoOpen && announcementReady && !announcement.visible && !reproMode.enabled}
+      />
+      {/* Extractor ColorChecker calibration popup. Mounted at the app root so
+          it appears regardless of whether the extractor is opened as the
+          full-page tab or as a dockable widget; it self-gates on the
+          extractor store's colorchecker phase. */}
+      {/* 提取器 ColorChecker 校色弹窗：挂载在应用根部，无论提取器是以整页标签
+          还是可停靠 widget 形式打开都能弹出；其显隐由提取器 store 的
+          colorchecker 阶段自行控制。 */}
+      <ColorcheckerConfirmDialogExtractor />
+      <NativeMaterialSelectionDialog />
+    </>
+  );
+
+  if (studioShell) {
+    return (
+      <>
+        <StudioShell
+          backendStatus={connected === null ? "checking" : connected ? "ok" : "fail"}
+          reproTicketId={reproMode.enabled ? reproMode.ticketId : null}
+          onReportBug={() => openBugReport("")}
+          onOpenAbout={openAbout}
+          suspended={infoOpen}
+          inert={infoOpen || projectOpening}
+        />
+        {globalOverlays}
+      </>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-200 text-slate-900 dark:bg-slate-950 dark:text-white">
       <header
@@ -600,45 +666,7 @@ function AppContent({ connected }: { connected: boolean | null }) {
         {activeTab === 'settings' && <SettingsPanel />}
         </div>
       </main>
-      {infoPage && <Suspense fallback={<LoadingSpinner />}><AboutDialog page={infoPage} onNavigate={setInfoPage} onClose={closeAbout} /></Suspense>}
-      <AnnouncementDialog
-        open={!infoOpen && announcementReady && announcement.visible}
-        entries={announcement.entries}
-        entry={announcement.entry}
-        onClose={announcement.close}
-        onDismissVersion={announcement.dismissThisVersion}
-      />
-      <BugReportModal
-        open={bugReportOpen}
-        onClose={closeBugReport}
-        presetDescription={bugReportPreset}
-      />
-      {/* Ask whether to file a ticket after an unexpected error; hidden while
-          the report form is open and during bug-report reproduction runs. */}
-      <ErrorTicketPrompt
-        info={bugReportOpen || reproMode.enabled ? null : errorTicketPrompt}
-        onReport={() => {
-          if (errorTicketPrompt) {
-            openBugReport(buildErrorTicketDescription(errorTicketPrompt, t));
-          }
-        }}
-        onDismiss={dismissErrorTicketPrompt}
-        onSuppress={suppressErrorTicketPrompt}
-      />
-      {/* Beginner tutorial: offered once after the release announcement is
-          gone, and never during bug-report reproduction sessions. */}
-      <TutorialHost
-        canAutoOffer={!infoOpen && announcementReady && !announcement.visible && !reproMode.enabled}
-      />
-      {/* Extractor ColorChecker calibration popup. Mounted at the app root so
-          it appears regardless of whether the extractor is opened as the
-          full-page tab or as a dockable widget; it self-gates on the
-          extractor store's colorchecker phase. */}
-      {/* 提取器 ColorChecker 校色弹窗：挂载在应用根部，无论提取器是以整页标签
-          还是可停靠 widget 形式打开都能弹出；其显隐由提取器 store 的
-          colorchecker 阶段自行控制。 */}
-      <ColorcheckerConfirmDialogExtractor />
-      <NativeMaterialSelectionDialog />
+      {globalOverlays}
     </div>
   );
 }

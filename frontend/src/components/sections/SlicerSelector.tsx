@@ -434,6 +434,7 @@ export default function SlicerSelector({
             >
               <button
                 type="button"
+                data-studio-action="generate-export"
                 onClick={() => void handleMainClick()}
                 disabled={isDisabled}
                 aria-label={mainButtonLabel}
@@ -527,6 +528,7 @@ export default function SlicerSelector({
               >
                 <button
                   type="button"
+                  data-studio-action="generate-export"
                   onClick={() => void handleMainClick()}
                   disabled={isDisabled}
                   aria-label={getButtonLabel(false, launchArtifactSource, null, t, largeFormat)}

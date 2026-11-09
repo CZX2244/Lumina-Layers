@@ -5,9 +5,11 @@
  */
 import splashTranslations from '../../../electron/splash-text.json';
 import { projectTranslations } from './projects';
+import { studioTranslations } from './studio';
 export const translations: Record<string, Record<"zh" | "en", string>> = {
   ...splashTranslations,
   ...projectTranslations,
+  ...studioTranslations,
   common_close: { zh: "关闭", en: "Close" },
   cloud_library_update: { zh: "更新", en: "Update" },
   cloud_library_results: { zh: "匹配结果", en: "Matching results" },

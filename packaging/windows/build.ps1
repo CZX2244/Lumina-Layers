@@ -24,7 +24,7 @@ param(
   # CPython version from the official python.org NuGet package.
   [string]$PythonVersion = "3.12.10",
   # Optional pinned base64 SHA-512 of the .nupkg; NuGet's registration hash is used otherwise.
-  [string]$PythonSha512 = "",
+  [string]$PythonSha512 = "u9pNz2iKlCEbYtUJaKkbOPMF0LjR7NkCafdKhvigpPzrt8oWKgdTpHaR6z3wyWQAm9PYGUxv0Zr66NX9AeHMDw==",
   # Skip electron-builder (stage + self-test only).
   [switch]$StageOnly
 )
@@ -120,9 +120,10 @@ foreach ($file in $CopyFiles) {
   $source = Join-Path $RepoRoot $file
   if (Test-Path $source) { Copy-Item -Force $source (Join-Path $StageApp $file) }
 }
-# Record the source revision for "About" and bug reports.
+# Record the source revision and build time (used by the in-app update check).
 $Revision = (git -C $RepoRoot rev-parse HEAD 2>$null)
-if ($Revision) { Set-Content -Encoding ascii (Join-Path $StageApp "SOURCE_REVISION") $Revision.Trim() }
+$BuildInfo = [ordered]@{ revision = if ($Revision) { $Revision.Trim() } else { "" }; builtAt = (Get-Date).ToUniversalTime().ToString("o") }
+$BuildInfo | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $StageApp "BUILD_INFO.json")
 
 # ── 4. Self-tests with the bundled runtime ────────────────────────
 Step "Running backend self-tests"

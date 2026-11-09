@@ -58,8 +58,6 @@ function distDataEnv({ userData, env = {} }) {
     LUMINA_LOG_DIR: path.join(userData, "backend-logs"),
     LUMINA_FEEDBACK_DUMP_DIR: path.join(userData, "feedback"),
     NUMBA_CACHE_DIR: path.join(userData, "numba-cache"),
-    // Personal build: keep bug reports on this computer unless the user opts in.
-    LUMINA_FEEDBACK_SERVER_URL: "off",
     PYTHONUTF8: "1",
     PYTHONDONTWRITEBYTECODE: "1",
   };

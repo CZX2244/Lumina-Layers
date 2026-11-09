@@ -24,6 +24,23 @@ if (launcherStartup.enabled) {
   app.on('will-quit', () => launcherStartup.failed());
 }
 const { saveGeneratedFile } = require("./generated-file-save.cjs");
+const {
+  createSavedPathTracker,
+  formatDownloadName,
+  normalizeNamingContext,
+  normalizeNamingTemplate,
+  taskbarProgressValue,
+} = require("./plus-desktop.cjs");
+const {
+  isNewerRelease,
+  mergePlusConfigUpdate,
+  plusConfigEnv,
+  publicPlusConfig,
+  readBuildInfo,
+  readPlusConfig,
+  writePlusConfig,
+} = require("./plus-config.cjs");
+const PLUS_UPDATE_REPO = process.env.LUMINA_PLUS_UPDATE_REPO || "CZX2244/Lumina-Layers";
 const { createApplicationMenu } = require("./application-menu.cjs");
 const { createProjectsHost, projectOpenFromArgv } = require("./projects.cjs");
 const {
@@ -396,9 +413,10 @@ function backendRuntimeEnv() {
     LUMINA_MATERIAL_LIBRARY_ALLOWED_LOCAL_PORTS: [process.env.LUMINA_MATERIAL_LIBRARY_ALLOWED_LOCAL_PORTS, backendEndpoint.port].filter(Boolean).join(","),
   };
   if (DIST_MODE) {
-    Object.assign(env, distDataEnv({ userData: app.getPath("userData"), env: process.env }), {
+    const userData = app.getPath("userData");
+    Object.assign(env, distDataEnv({ userData, env: process.env }), {
       LUMINA_FRONTEND_DIST_DIR: RUNTIME_LAYOUT.frontendDistDir,
-    });
+    }, plusConfigEnv(readPlusConfig(userData), process.env));
   }
   return env;
 }
@@ -731,6 +749,22 @@ function createWindow() {
     return { action: "allow" };
   });
 
+  const trackDownload = (item, savePath) => {
+    item.on("updated", () => {
+      if (!win || win.isDestroyed()) return;
+      const total = item.getTotalBytes();
+      win.setProgressBar(total > 0 ? item.getReceivedBytes() / total : 2);
+    });
+    item.once("done", (_event, state) => {
+      if (!win || win.isDestroyed()) return;
+      win.setProgressBar(-1);
+      if (state !== "completed") return;
+      savedPaths.add(savePath);
+      if (!win.isFocused()) win.flashFrame(true);
+      win.webContents.send("plus-download-done", { path: savePath, name: path.basename(savePath) });
+    });
+  };
+
   session.defaultSession.on("will-download", (event, item, webContents) => {
     if (
       !isAllowedWorkshopDownload({
@@ -741,13 +775,14 @@ function createWindow() {
       event.preventDefault();
       return;
     }
-    const filename = item.getFilename();
+    const filename = formatDownloadName(downloadNaming.template, item.getFilename(), downloadNaming.context);
     const savePath = dialog.showSaveDialogSync(win, {
       defaultPath: resolveDefaultSavePath(generatedFileDirectory.get(), filename),
       filters: [{ name: "All Files", extensions: ["*"] }],
     });
     if (savePath) {
       item.setSavePath(savePath);
+      trackDownload(item, savePath);
     } else {
       event.preventDefault();
     }
@@ -941,14 +976,91 @@ ipcMain.handle("open-wiki", async (event, url) => {
   return { opened: true };
 });
 
-ipcMain.handle("save-generated-file", (event, payload) => saveGeneratedFile({
-  event,
-  window: win,
-  trustedUrl: trustedMainFrameUrl,
-  payload,
-  showSaveDialog: (owner, options) => dialog.showSaveDialog(owner, options),
-  defaultDirectory: generatedFileDirectory.get(),
-}));
+ipcMain.handle("save-generated-file", async (event, payload) => {
+  const result = await saveGeneratedFile({
+    event,
+    window: win,
+    trustedUrl: trustedMainFrameUrl,
+    payload,
+    showSaveDialog: (owner, options) => dialog.showSaveDialog(owner, options),
+    defaultDirectory: generatedFileDirectory.get(),
+  });
+  if (result.status === "saved" && result.filePath) savedPaths.add(result.filePath);
+  return result;
+});
+
+// ── Lumina Studio Plus: reveal saved files, download naming, taskbar progress ──
+const savedPaths = createSavedPathTracker();
+let downloadNaming = { template: "", context: {} };
+
+ipcMain.handle("plus-show-item-in-folder", (event, filePath) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl) || !savedPaths.has(filePath)) return false;
+  shell.showItemInFolder(filePath);
+  return true;
+});
+
+ipcMain.on("plus-set-download-naming", (event, payload) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return;
+  downloadNaming = {
+    template: normalizeNamingTemplate(payload?.template),
+    context: normalizeNamingContext(payload?.context),
+  };
+});
+
+ipcMain.handle("plus-get-config", (event) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return null;
+  return { config: publicPlusConfig(readPlusConfig(app.getPath("userData"))), managed: DIST_MODE };
+});
+
+ipcMain.handle("plus-set-config", (event, update) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return null;
+  const userData = app.getPath("userData");
+  const config = writePlusConfig(userData, mergePlusConfigUpdate(readPlusConfig(userData), update));
+  return { config: publicPlusConfig(config), managed: DIST_MODE };
+});
+
+ipcMain.handle("plus-relaunch", (event) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return false;
+  isQuitting = true;
+  app.relaunch();
+  app.quit();
+  return true;
+});
+
+ipcMain.handle("plus-check-update", async (event) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return null;
+  const buildInfo = readBuildInfo(ROOT_DIR);
+  if (!buildInfo) return { status: "unknown" };
+  try {
+    const response = await electronNet.fetch(`https://api.github.com/repos/${PLUS_UPDATE_REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "LuminaStudioPlus" },
+    });
+    if (response.status === 404) return { status: "none" };
+    if (!response.ok) return { status: "error" };
+    const release = await response.json();
+    return isNewerRelease(release, buildInfo)
+      ? { status: "available", tag: String(release.tag_name ?? ""), url: String(release.html_url ?? "") }
+      : { status: "current" };
+  } catch {
+    return { status: "error" };
+  }
+});
+
+ipcMain.handle("plus-open-release", async (event, url) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return false;
+  if (typeof url !== "string" || !url.startsWith(`https://github.com/${PLUS_UPDATE_REPO}/releases`)) return false;
+  await shell.openExternal(url);
+  return true;
+});
+
+ipcMain.on("plus-set-taskbar-progress", (event, state) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl) || !win || win.isDestroyed()) return;
+  if (state === "attention") {
+    if (!win.isFocused()) win.flashFrame(true);
+    return;
+  }
+  win.setProgressBar(taskbarProgressValue(state));
+});
 
 ipcMain.handle("set-generated-file-directory", (event, directory) =>
   setGeneratedFileDirectory({
