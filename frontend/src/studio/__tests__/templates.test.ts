@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeImportedPresets, serializePresets, PRESET_FILE_FORMAT } from "../templates/productTemplates";
+import { mergeImportedPresets, serializePresets, PRESET_FILE_FORMAT } from "../templates/templateRegistry";
 import { captureConversionParameters, type ConversionPreset } from "../../stores/conversionPreferences";
 import { useConverterStore } from "../../stores/converter";
 

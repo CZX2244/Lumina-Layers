@@ -7,7 +7,7 @@ import { ArrowDownTrayIcon, ArrowUpTrayIcon } from "@heroicons/react/24/outline"
 import { useI18n } from "../../i18n/context";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { saveGeneratedFile } from "../../utils/saveGeneratedFile";
-import { applyProductTemplate, mergeImportedPresets, PRODUCT_TEMPLATES, serializePresets } from "./productTemplates";
+import { applyProductTemplate, mergeImportedPresets, PRODUCT_TEMPLATES, serializePresets } from "./templateRegistry";
 
 export function ProductTemplates() {
   const { t } = useI18n();

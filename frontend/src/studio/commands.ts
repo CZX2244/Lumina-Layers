@@ -10,7 +10,7 @@ import { allStudioNavItems, navigateStudio, STUDIO_PAGE_SECTIONS } from "./navig
 import { requestProjectCommand } from "./projectCommands";
 import { useStudioPrefsStore } from "./studioPrefsStore";
 import { OPEN_PRODUCT_EVENT, scrollWorkbenchStep, WORKBENCH_PRODUCTS, WORKBENCH_STEPS, type WorkbenchStepId } from "./workbenchSteps";
-import { applyProductTemplate, PRODUCT_TEMPLATES } from "./templates/productTemplates";
+import { applyProductTemplate, PRODUCT_TEMPLATES } from "./templates/templateRegistry";
 
 export type CommandGroup = "navigate" | "converter" | "project" | "app";
 
