@@ -189,6 +189,9 @@ html.dp-studio .action-control { border-width: 1.5px; }
 html.dp-studio .action-control-primary { color: var(--dp-on-primary); font-weight: 700; border-color: transparent; }
 html.dp-studio .action-control-primary svg { color: var(--dp-on-primary); }
 
+/* Range tracks sit on surface-1 panels; give them the control edge colour so they stay visible. */
+html.dp-studio .slider-track { background-color: var(--dp-outline-strong) !important; }
+
 /* Shared typography helpers for the studio shell. */
 .dp-display { font-family: var(--dp-font-display); font-weight: 600; letter-spacing: -0.01em; }
 .dp-mono { font-family: var(--dp-font-mono); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }

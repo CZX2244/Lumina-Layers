@@ -32,7 +32,7 @@ export function PreflightPanel() {
   return (
     <section data-testid="studio-preflight" aria-label={t("studio.preflight.title")} className="mx-3 mt-2 rounded-[10px] bg-[var(--surface-well)] px-3 py-2.5">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-        {issues.length === 0 ? (
+        {blocking + warnings === 0 ? (
           <CheckCircleIcon aria-hidden="true" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
         ) : blocking ? (
           <XCircleIcon aria-hidden="true" className="h-4 w-4 text-red-600 dark:text-red-400" />
@@ -40,7 +40,7 @@ export function PreflightPanel() {
           <ExclamationTriangleIcon aria-hidden="true" className="h-4 w-4 text-amber-600 dark:text-amber-400" />
         )}
         <span>
-          {issues.length === 0
+          {blocking + warnings === 0
             ? t("studio.preflight.all_clear")
             : formatPreflightMessage(t("studio.preflight.summary"), { errors: blocking, warnings })}
         </span>

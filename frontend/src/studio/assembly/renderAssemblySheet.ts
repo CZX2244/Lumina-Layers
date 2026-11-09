@@ -15,10 +15,12 @@ export interface AssemblySheetText {
   orientation: string;
   legendTitle: string;
   footnote: string;
+  /** Marker for parts the backend did not generate. */
+  missing: string;
   formatSize: (widthMm: number, heightMm: number) => string;
 }
 
-const { paper: PAPER, ink: INK, muted: MUTED, rule: RULE, leaf: LEAF, labelFill: LABEL_FILL } = ASSEMBLY_SHEET_COLORS;
+const { paper: PAPER, ink: INK, muted: MUTED, rule: RULE, leaf: LEAF, labelFill: LABEL_FILL, missingShade: MISSING_SHADE } = ASSEMBLY_SHEET_COLORS;
 const SANS = '"Noto Sans SC", "Source Han Sans SC", "MiSans", "Microsoft YaHei", system-ui, sans-serif';
 const MONO = '"IBM Plex Mono", ui-monospace, monospace';
 
@@ -102,6 +104,10 @@ export async function renderAssemblySheet(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (const cell of layout.cells) {
+    if (cell.missing) {
+      ctx.fillStyle = MISSING_SHADE;
+      ctx.fillRect(artX + cell.xMm * scale, artY + cell.yMm * scale, cell.widthMm * scale, cell.heightMm * scale);
+    }
     const cx = artX + (cell.xMm + cell.widthMm / 2) * scale;
     const cy = artY + (cell.yMm + cell.heightMm / 2) * scale;
     const boxW = ctx.measureText(cell.label).width + 16;
@@ -139,7 +145,8 @@ export async function renderAssemblySheet(
     ctx.fillStyle = INK;
     ctx.fillText(cell.exportName, x, y);
     ctx.fillStyle = MUTED;
-    ctx.fillText(`${fmt(cell.widthMm)}×${fmt(cell.heightMm)} mm`, x + Math.min(150, colW * 0.55), y);
+    const size = `${fmt(cell.widthMm)}×${fmt(cell.heightMm)} mm`;
+    ctx.fillText(cell.missing ? `${size} · ${text.missing}` : size, x + Math.min(150, colW * 0.55), y);
   });
 
   ctx.strokeStyle = RULE;

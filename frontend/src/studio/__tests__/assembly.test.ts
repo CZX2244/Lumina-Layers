@@ -6,7 +6,9 @@ describe("large-format assembly layout", () => {
     const layout = largeFormatAssembly({ widthMm: 500, heightMm: 300, tileWidthMm: 200, tileHeightMm: 200 })!;
     expect(layout.rows).toBe(2);
     expect(layout.cols).toBe(3);
-    expect(layout.cells.map((cell) => cell.exportName)).toEqual(["R1C1.3mf", "R1C2.3mf", "R1C3.3mf", "R2C1.3mf", "R2C2.3mf", "R2C3.3mf"]);
+    expect(layout.cells.map((cell) => cell.label)).toEqual(["R1C1", "R1C2", "R1C3", "R2C1", "R2C2", "R2C3"]);
+    // ZIP entries are "<image name>_R1C1.3mf" (core/vector_large_format.py).
+    expect(layout.cells[0].exportName).toBe("…_R1C1.3mf");
   });
 
   it("keeps the remainder on the last column and row", () => {
@@ -17,6 +19,11 @@ describe("large-format assembly layout", () => {
     expect(byLabel.R2C3).toMatchObject({ yMm: 200, widthMm: 100, heightMm: 100 });
     const area = layout.cells.reduce((sum, cell) => sum + cell.widthMm * cell.heightMm, 0);
     expect(area).toBeCloseTo(500 * 300);
+  });
+
+  it("marks tiles the backend reported as not generated", () => {
+    const layout = largeFormatAssembly({ widthMm: 300, heightMm: 400, tileWidthMm: 330, tileHeightMm: 300, failedTiles: ["R2C1"] })!;
+    expect(layout.cells.map((cell) => [cell.label, Boolean(cell.missing)])).toEqual([["R1C1", false], ["R2C1", true]]);
   });
 
   it("does not add an empty column when the size divides exactly", () => {

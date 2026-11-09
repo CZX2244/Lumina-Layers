@@ -5,6 +5,7 @@
 import type { ConverterActions, ConverterState } from "../../stores/converter/types";
 import { useConverterStore } from "../../stores/converter";
 import { navigateStudio } from "../navigation";
+import { OPEN_PRODUCT_EVENT } from "../workbenchSteps";
 import {
   normalizeConversionPreferences,
   validatePresetName,
@@ -19,6 +20,8 @@ export interface ProductTemplate {
   detailKey: string;
   /** Long edge in millimetres. */
   sizeMm: number;
+  /** Workbench product card this template switches on (expanded after applying). */
+  productId?: string;
   apply: (state: Store, context: { bedWidthMm: number | null; bedHeightMm: number | null }) => void;
 }
 
@@ -40,6 +43,7 @@ function setLongEdge(state: Store, sizeMm: number): void {
 export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   {
     id: "keychain",
+    productId: "keychain",
     titleKey: "studio.template.keychain",
     detailKey: "studio.template.keychain_detail",
     sizeMm: 50,
@@ -51,6 +55,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   },
   {
     id: "fridge-magnet",
+    productId: "fridge-magnet",
     titleKey: "studio.template.fridge_magnet",
     detailKey: "studio.template.fridge_magnet_detail",
     sizeMm: 70,
@@ -72,6 +77,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   },
   {
     id: "puzzle",
+    productId: "puzzle",
     titleKey: "studio.template.puzzle",
     detailKey: "studio.template.puzzle_detail",
     sizeMm: 180,
@@ -108,6 +114,8 @@ export function applyProductTemplate(template: ProductTemplate): void {
   const bed = state.bedSizes.find((item) => item.label === state.bed_label) ?? null;
   template.apply(state, { bedWidthMm: bed?.width_mm ?? null, bedHeightMm: bed?.height_mm ?? null });
   navigateStudio("converter");
+  const productId = template.productId;
+  if (productId) window.setTimeout(() => window.dispatchEvent(new CustomEvent(OPEN_PRODUCT_EVENT, { detail: productId })), 200);
 }
 
 // ── Preset files ──────────────────────────────────────────────────

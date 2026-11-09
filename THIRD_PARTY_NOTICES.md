@@ -83,3 +83,11 @@ Xiaomi Inc. and retain the MiSans Font Intellectual Property License Agreement,
 not the root software license. The bundled [license agreement](frontend/public/fonts/misans/LICENSE.pdf)
 and [notice](frontend/public/fonts/misans/NOTICE.txt) accompany the fonts.
 Official source: <https://hyperos.mi.com/font/zh/download/>.
+
+## Fraunces and IBM Plex Mono (Lumina Studio Plus shell)
+
+The WOFF2 files in `frontend/public/fonts/dewpoint/` are used by the personal
+build's studio shell. Fraunces (Undercase Type, Phaedra Charles and Flavia
+Zimbardi) and IBM Plex Mono (IBM Corp.) are licensed under the
+[SIL Open Font License 1.1](https://openfontlicense.org/open-font-license-official-text/),
+not the root software license; see `frontend/public/fonts/dewpoint/NOTICE.txt`.

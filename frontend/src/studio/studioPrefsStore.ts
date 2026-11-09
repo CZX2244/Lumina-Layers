@@ -9,6 +9,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useWidgetStore } from "../stores/widgetStore";
+import { useProjectSessionStore } from "../stores/projectSessionStore";
 import type { TabId } from "../types/widget";
 
 /** Cloud library pages are disabled in the personal build; mirrors navigation.ts. */
@@ -18,6 +19,9 @@ export const CLOUD_TAB_FALLBACK: Partial<Record<TabId, TabId>> = {
 };
 
 export type UiShell = "studio" | "classic";
+
+/** Windows narrower than this (CSS px) start with the sidebar collapsed. */
+export const NARROW_VIEWPORT_MAX_PX = 1279;
 export type StudioView = "home" | "app";
 
 /** Tests keep the classic shell so upstream DOM-level suites stay valid. */
@@ -27,6 +31,8 @@ interface StudioPrefsState {
   shell: UiShell;
   view: StudioView;
   sidebarCollapsed: boolean;
+  /** Narrow windows collapse the sidebar; this opens it until the next toggle. 窄窗口临时展开侧栏。 */
+  narrowSidebarExpanded: boolean;
   /** First-run checklist on the home page was dismissed. 首页首启清单已关闭。 */
   checklistDismissed: boolean;
   /** Desktop download file-name template; must contain {name}. 下载文件名模板。 */
@@ -46,12 +52,17 @@ export const useStudioPrefsStore = create<StudioPrefsState>()(
       shell: DEFAULT_SHELL,
       view: "home",
       sidebarCollapsed: false,
+      narrowSidebarExpanded: false,
       checklistDismissed: false,
       downloadNameTemplate: "{name}",
       setShell: (shell) => set({ shell }),
       showHome: () => set({ view: "home" }),
       showApp: () => set({ view: "app" }),
-      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+      toggleSidebar: () => set((state) => {
+        const narrow = typeof window !== "undefined" && typeof window.matchMedia === "function"
+          && window.matchMedia(`(max-width: ${NARROW_VIEWPORT_MAX_PX}px)`).matches;
+        return narrow ? { narrowSidebarExpanded: !state.narrowSidebarExpanded } : { sidebarCollapsed: !state.sidebarCollapsed };
+      }),
       dismissChecklist: () => set({ checklistDismissed: true }),
       restoreChecklist: () => set({ checklistDismissed: false }),
       setDownloadNameTemplate: (template) => set({ downloadNameTemplate: template.includes("{name}") ? template.slice(0, 120) : "{name}" }),
@@ -90,3 +101,12 @@ useWidgetStore.subscribe(
   const restored = CLOUD_TAB_FALLBACK[useWidgetStore.getState().activeTab];
   if (restored) useWidgetStore.getState().setActiveTab(restored);
 }
+
+// Opening a project lands in its workspace even when its page was already the
+// active tab (the activeTab subscription above would not fire then).
+// 打开工程后进入工作区，即使对应页面原本就是当前标签。
+useProjectSessionStore.subscribe((state, previous) => {
+  if (previous.status === "opening" && state.status !== "opening" && state.status !== "error") {
+    if (useStudioPrefsStore.getState().view !== "app") useStudioPrefsStore.getState().showApp();
+  }
+});

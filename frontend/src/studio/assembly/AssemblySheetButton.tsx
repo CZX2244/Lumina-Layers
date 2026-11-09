@@ -27,6 +27,7 @@ export function AssemblySheetButton() {
     overlay: state.puzzleOverlayUrl,
     artwork: state.previewImageUrl ?? state.imagePreviewUrl,
     name: state.imageFile?.name ?? null,
+    failedTiles: state.largeFormatFailedTiles,
   })));
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,6 +39,7 @@ export function AssemblySheetButton() {
       heightMm: resolveLargeFormatTotalHeightMm(s.width, s.height, s.previewW, s.previewH),
       tileWidthMm: s.tileW,
       tileHeightMm: s.tileH,
+      failedTiles: s.failedTiles,
     })
     : s.rows && s.cols ? puzzleAssembly({ widthMm: s.width, heightMm: s.height, rows: s.rows, cols: s.cols }) : null;
   const reason = !s.artwork ? t("studio.assembly.need_image") : !layout ? t(s.puzzle ? "studio.assembly.need_puzzle_preview" : "studio.assembly.need_size") : null;
@@ -53,6 +55,7 @@ export function AssemblySheetButton() {
         orientation: t("studio.assembly.orientation"),
         legendTitle: t(layout.kind === "puzzle" ? "studio.assembly.legend_puzzle" : "studio.assembly.legend_tiles"),
         footnote: t(layout.kind === "puzzle" ? "studio.assembly.footnote_puzzle" : "studio.assembly.footnote_tiles"),
+        missing: t("studio.assembly.missing"),
         formatSize: (w, h) => t("studio.assembly.total").replace("{w}", w.toFixed(1)).replace("{h}", h.toFixed(1)),
       });
       const outcome = await saveGeneratedFile(blob, assemblySheetFileName(s.name), "assembly");

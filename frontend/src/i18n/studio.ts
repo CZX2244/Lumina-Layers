@@ -155,7 +155,8 @@ export const studioTranslations = {
   "studio.assembly.total": { zh: "成品 {w} × {h} mm", en: "Overall {w} × {h} mm" },
   "studio.assembly.legend_tiles": { zh: "ZIP 中的文件与尺寸", en: "Files in the ZIP and their sizes" },
   "studio.assembly.legend_puzzle": { zh: "3MF 中的拼图块与名义尺寸", en: "Puzzle pieces in the 3MF and nominal sizes" },
-  "studio.assembly.footnote_tiles": { zh: "从左上角开始按行编号：R 是行，C 是列。最后一行和最后一列保留余下的尺寸。", en: "Numbered row by row from the top-left: R is the row, C the column. The last row and column keep the remainder." },
+  "studio.assembly.footnote_tiles": { zh: "从左上角开始按行编号：R 是行，C 是列，ZIP 里的文件名以同样的编号结尾。最后一行和最后一列保留余下的尺寸；标“未生成”的块上次没有导出（例如整块透明）。", en: "Numbered row by row from the top-left: R is the row, C the column; ZIP file names end with the same id. The last row and column keep the remainder; parts marked “not generated” were not exported last time (for example, fully transparent tiles)." },
+  "studio.assembly.missing": { zh: "未生成", en: "not generated" },
   "studio.assembly.footnote_puzzle": { zh: "编号按行（字母）和列（数字）排列，切线以图上实线为准；异形拼图的尺寸是名义值。", en: "Labels are row letter plus column number; cut lines follow the drawn lines. Sizes of irregular pieces are nominal." },
 
   // Status bar & saved toast

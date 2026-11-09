@@ -1,0 +1,11 @@
+Fonts in this folder
+
+Fraunces-Variable.woff2
+  Copyright 2018 The Fraunces Project Authors (https://github.com/undercasetype/Fraunces)
+IBMPlexMono-Regular.woff2, IBMPlexMono-Medium.woff2
+  Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+
+These Font Software are licensed under the SIL Open Font License, Version 1.1.
+The license is available with a FAQ at: https://openfontlicense.org
+They are distributed unmodified for use in the application's interface and
+are not sold by themselves.

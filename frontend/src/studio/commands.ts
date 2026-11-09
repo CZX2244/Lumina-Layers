@@ -41,6 +41,22 @@ export function clickStudioControl(selector: string): boolean {
   return true;
 }
 
+/**
+ * Click a control once it exists and is enabled (e.g. a picker that is
+ * disabled while its catalogue loads). Gives up after `timeoutMs`.
+ */
+export function clickStudioControlWhenReady(selector: string, timeoutMs = 8000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    const attempt = () => {
+      if (clickStudioControl(selector)) return resolve(true);
+      if (Date.now() > deadline) return resolve(false);
+      window.setTimeout(attempt, 150);
+    };
+    attempt();
+  });
+}
+
 export function runPreview(): boolean {
   return clickStudioControl('[data-tutorial="preview-button"] button');
 }

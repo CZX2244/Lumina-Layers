@@ -4,8 +4,10 @@
  *
  * Large format reuses `utils/largeFormatTileLayout.ts`, which mirrors the
  * backend split: tiles start at the artwork's top-left corner, run row by
- * row, the last column/row keeps the remainder, and each tile is exported as
- * `R{row}C{col}.3mf` inside the ZIP. Puzzle labels mirror
+ * row and the last column/row keeps the remainder. Each tile is exported as
+ * `<image name>_R{row}C{col}.3mf` inside the ZIP (core/vector_large_format.py
+ * `format_large_format_tile_label`); the sheet keys tiles by that stable
+ * `R{row}C{col}` suffix and marks tiles the backend reported as not generated. Puzzle labels mirror
  * `core/puzzle.py::_format_piece_label` (row letters, column number: A1, B3,
  * AA12) used for the exported `puzzle_{label}_…` objects.
  * 大画幅复用与后端一致的切分（左上角起按行切、末行末列留余量，ZIP 内 R{行}C{列}.3mf）；
@@ -24,6 +26,8 @@ export interface AssemblyCell {
   yMm: number;
   widthMm: number;
   heightMm: number;
+  /** The backend reported this part as not generated (e.g. an empty tile). */
+  missing?: boolean;
 }
 
 export interface AssemblyLayout {
@@ -54,6 +58,8 @@ export function largeFormatAssembly(input: {
   heightMm: number;
   tileWidthMm: number;
   tileHeightMm: number;
+  /** Tile ids (`R2C1`) the last generation reported as failed. */
+  failedTiles?: readonly string[];
 }): AssemblyLayout | null {
   const grid = resolveLargeFormatTileGrid(input.widthMm, input.heightMm, input.tileWidthMm, input.tileHeightMm);
   if (!grid) return null;
@@ -63,9 +69,10 @@ export function largeFormatAssembly(input: {
       const label = formatLargeFormatTileLabel(row, col);
       cells.push({
         label,
-        exportName: `${label}.3mf`,
+        exportName: `…_${label}.3mf`,
         row,
         col,
+        missing: input.failedTiles?.includes(label) || undefined,
         xMm: round2((col - 1) * input.tileWidthMm),
         yMm: round2((row - 1) * input.tileHeightMm),
         widthMm: round2(col === grid.cols ? grid.lastColumnWidthMm : input.tileWidthMm),

@@ -23,7 +23,7 @@ import { navigateStudio } from "./navigation";
 import { requestProjectCommand } from "./projectCommands";
 import { useStudioPrefsStore } from "./studioPrefsStore";
 import { openImagesInConverter } from "./useStudioInput";
-import { clickStudioControl, goToWorkbenchStep } from "./commands";
+import { clickStudioControlWhenReady, goToWorkbenchStep } from "./commands";
 import { ProductTemplates } from "./templates/ProductTemplates";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/bmp,image/gif,image/heic,image/heif,image/svg+xml,.svg,.heic,.heif";
@@ -112,7 +112,7 @@ function FirstRunChecklist() {
               <SmallButton testId="studio-path-builtin" label={t("studio.home.path_builtin")} onClick={() => {
                 if (useConverterStore.getState().source_version !== "legacy") setSourceVersion("legacy");
                 goToWorkbenchStep("color");
-                window.setTimeout(() => clickStudioControl('[data-tutorial="color-source"] button[aria-haspopup="dialog"], [data-tutorial="color-source"] [data-lut-picker-trigger]'), 400);
+                void clickStudioControlWhenReady('[data-testid="lut-picker-trigger"]');
               }} />
               <SmallButton testId="studio-path-import" label={t("studio.home.path_import")} onClick={() => navigateStudio("lut-library")} />
               <SmallButton testId="studio-path-calibrate" label={t("studio.home.path_calibrate")} onClick={() => navigateStudio("gradient-card-generate")} />

@@ -25,7 +25,13 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
 
 设置、耗材档案、自定义 LUT、缓存、日志和输出都在
 `%APPDATA%\Lumina Studio Plus\`，重装或升级不会丢失。
-反馈报告默认只保存在本机，不上传官方服务器。
+
+## 离线与隐私
+
+- 个人版不连接任何云端耗材库或云 LUT 库，也不上传问题报告。
+- 问题报告和日志只保存在本机：设置 → 增强功能 → 诊断与更新，可以打开对应文件夹。
+- 更新需要手动检查：同一位置点“检查个人版更新”，会查询本仓库的 Releases；启动时不联网。
+- 旧版本如果在 `plus-config.json` 里存过 Registry 地址或令牌，启动时会自动删除。
 
 ## 常见问题
 

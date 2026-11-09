@@ -279,7 +279,7 @@ export function StudioShell({ backendStatus, reproTicketId, onReportBug, onOpenA
           <StatusBar backendStatus={backendStatus} />
         </div>
       </div>
-      <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
+      {paletteOpen && <CommandPalette open commands={commands} onClose={() => setPaletteOpen(false)} />}
       <ShortcutsDialog open={shortcutsOpen} commands={commands} onClose={() => setShortcutsOpen(false)} />
       <SavedFileToast />
     </div>

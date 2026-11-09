@@ -6,7 +6,8 @@ import { useI18n } from "../i18n/context";
 import { useWidgetStore } from "../stores/widgetStore";
 import { StudioIcon } from "./StudioIcon";
 import { navigateStudio, navOwnerOf, STUDIO_NAV_GROUPS, STUDIO_SETTINGS_ITEM, type StudioNavItem } from "./navigation";
-import { useStudioPrefsStore } from "./studioPrefsStore";
+import { NARROW_VIEWPORT_MAX_PX, useStudioPrefsStore } from "./studioPrefsStore";
+import { useNarrowViewport } from "./useNarrowViewport";
 
 function NavButton({
   label,
@@ -46,7 +47,11 @@ export function StudioSidebar() {
   const { t } = useI18n();
   const activeTab = useWidgetStore((state) => state.activeTab);
   const view = useStudioPrefsStore((state) => state.view);
-  const collapsed = useStudioPrefsStore((state) => state.sidebarCollapsed);
+  const preferCollapsed = useStudioPrefsStore((state) => state.sidebarCollapsed);
+  // Small windows (e.g. 1366×768 at 125% scaling) give the preview the room.
+  const narrow = useNarrowViewport(NARROW_VIEWPORT_MAX_PX);
+  const narrowExpanded = useStudioPrefsStore((state) => state.narrowSidebarExpanded);
+  const collapsed = narrow ? !narrowExpanded : preferCollapsed;
   const showHome = useStudioPrefsStore((state) => state.showHome);
   const owner = navOwnerOf(activeTab);
   const isActive = (tab: StudioNavItem["tab"]) => view === "app" && owner === tab;

@@ -101,7 +101,7 @@ function CollapsibleCard({
       >
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {badge && (
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+          <span className="rounded-full bg-[var(--dp-status-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--dp-on-status)]">
             {badge}
           </span>
         )}
@@ -171,7 +171,7 @@ export function ConverterWorkbench({ suspended }: { suspended: boolean }) {
         <aside
           data-testid="studio-workbench-settings"
           aria-label={t("studio.workbench.settings")}
-          className="dock-scrollbar w-[22.5rem] shrink-0 overflow-y-auto overscroll-contain border-r panel-divider bg-[var(--surface-panel-strong)]"
+          className="dock-scrollbar w-[clamp(17rem,24vw,22.5rem)] shrink-0 overflow-y-auto overscroll-contain border-r panel-divider bg-[var(--surface-panel-strong)]"
         >
           <WorkbenchStepNav />
           <div className="p-3">
@@ -209,7 +209,7 @@ export function ConverterWorkbench({ suspended }: { suspended: boolean }) {
         <aside
           data-testid="studio-workbench-export"
           aria-label={t("studio.workbench.export")}
-          className="dock-scrollbar w-[21rem] shrink-0 overflow-y-auto overscroll-contain border-l panel-divider bg-[var(--surface-panel-strong)]"
+          className="dock-scrollbar w-[clamp(15rem,20vw,21rem)] shrink-0 overflow-y-auto overscroll-contain border-l panel-divider bg-[var(--surface-panel-strong)]"
         >
           <h2 className="px-4 pb-1 pt-4 text-[13px] font-semibold text-slate-900 dark:text-slate-100">{t("studio.workbench.export")}</h2>
           <PreflightPanel />

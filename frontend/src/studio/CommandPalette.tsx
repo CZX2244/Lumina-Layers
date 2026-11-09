@@ -23,12 +23,12 @@ export function CommandPalette({ open, commands, onClose }: { open: boolean; com
     return [...filtered].sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group));
   }, [commands, query, t]);
 
+  // The shell mounts the palette only while it is open, so every opening
+  // starts with an empty query.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
-      setQuery("");
-      setActive(0);
       dialog.showModal();
       window.setTimeout(() => inputRef.current?.focus(), 0);
     } else if (!open && dialog.open) {

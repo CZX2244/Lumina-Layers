@@ -10,4 +10,5 @@ export const ASSEMBLY_SHEET_COLORS = {
   rule: "#B3AE9C",
   leaf: "#B6C83F",
   labelFill: "rgba(250, 249, 245, 0.92)",
+  missingShade: "rgba(20, 20, 19, 0.35)",
 } as const;
