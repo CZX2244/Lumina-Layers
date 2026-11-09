@@ -1,0 +1,227 @@
+/*
+ * 露点 Dewpoint 3 theme for the Lumina Studio Plus shell.
+ * Applied with `html.dp-studio` (set while the studio shell is active), so the
+ * reused Lumina components and their portaled dialogs pick it up, while the
+ * classic layout keeps the original look.
+ *
+ * Only interface chrome is remapped: neutral surfaces, text, borders, accent
+ * and radii. Filament palette swatches (--palette-*), image previews, LUT
+ * colour grids and the 3D scene keep their real colours.
+ *
+ * Token values come from the design system's tokens.json (晨光 light / 月湖 dark).
+ */
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/dewpoint/Fraunces-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/dewpoint/IBMPlexMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/fonts/dewpoint/IBMPlexMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+html.dp-studio {
+  /* ── Dewpoint tokens · 晨光 Daybreak ── */
+  --dp-surface: #FAF9F5;
+  --dp-surface-1: #F1EFE7;
+  --dp-surface-2: #E8E6DC;
+  --dp-surface-card: #FFFFFF;
+  --dp-on-surface: #141413;
+  --dp-on-surface-muted: #6B6B5B;
+  --dp-outline: #B3AE9C;
+  --dp-outline-strong: #8A867A;
+  --dp-outline-ink: #141413;
+  --dp-primary: #B6C83F;
+  --dp-primary-hover: #C7D564;
+  --dp-on-primary: #141413;
+  --dp-on-primary-muted: #414912;
+  --dp-link: #5A6516;
+  --dp-signature: #F9BA57;
+  --dp-focus: #4D8A97;
+  --dp-ghost: rgba(103, 164, 182, 0.34);
+  --dp-ghost-edge: #B6C83F;
+  --dp-info: #2F6570;
+  --dp-info-bg: #E2F0EC;
+  --dp-error: #9B3B2E;
+  --dp-error-bg: #F5DEDA;
+  --dp-status-bg: #EAF0C4;
+  --dp-on-status: #414912;
+  --dp-note-ink: #8A5E1A;
+  --dp-water-line: #2F6570;
+
+  --dp-font-display: "Fraunces", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --dp-font-mono: "IBM Plex Mono", "Noto Sans SC", ui-monospace, monospace;
+
+  /* ── Lumina tokens mapped onto Dewpoint ── */
+  --font-sans: "Noto Sans SC", "Source Han Sans SC", "MiSans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --surface-panel: var(--dp-surface);
+  --surface-panel-strong: var(--dp-surface);
+  --surface-section: transparent;
+  --surface-section-muted: var(--dp-surface-1);
+  --surface-card: var(--dp-surface-card);
+  --surface-well: var(--dp-surface-1);
+  --surface-divider: var(--dp-outline);
+  --surface-card-outline: var(--dp-outline);
+  --surface-outline: var(--dp-outline-strong);
+  --surface-border: var(--dp-outline);
+  --surface-text-muted: var(--dp-on-surface-muted);
+  --surface-scrim: rgba(20, 20, 19, 0.42);
+  --button-bg: var(--dp-surface);
+  --button-border: var(--dp-outline-ink);
+  --button-text: var(--dp-on-surface);
+  --button-hover: var(--dp-surface-1);
+  --button-pressed: var(--dp-surface-2);
+  --button-primary: var(--dp-primary);
+  --button-primary-hover: var(--dp-primary-hover);
+  --button-primary-pressed: #A9BB33;
+  --button-disabled-bg: var(--dp-surface-2);
+  --button-disabled-text: var(--dp-on-surface-muted);
+  --button-danger: var(--dp-error);
+  --nav-tab-selected-bg: var(--dp-primary);
+  --nav-tab-selected-text: var(--dp-on-primary);
+  --nav-chip-hover: rgba(20, 20, 19, 0.06);
+  --nav-chip-active: var(--dp-surface-2);
+  --focus-ring: var(--dp-focus);
+  --info-soft: var(--dp-info-bg);
+  --info-border: var(--dp-info);
+  --error-soft: var(--dp-error-bg);
+  --error-border: var(--dp-error);
+  --success-soft: var(--dp-status-bg);
+  --success-border: var(--dp-link);
+  --warning-soft: #F7EBD4;
+  --warning-border: var(--dp-note-ink);
+
+  /* Tailwind neutrals → warm paper/ink scale; blues → leaf scale (text-safe at 600+). */
+  --color-slate-50: #FAF9F5;
+  --color-slate-100: #F1EFE7;
+  --color-slate-200: #E8E6DC;
+  --color-slate-300: #D3CFC0;
+  --color-slate-400: #A8A391;
+  --color-slate-500: #7A786A;
+  --color-slate-600: #6B6B5B;
+  --color-slate-700: #4A4A3F;
+  --color-slate-800: #3A4049;
+  --color-slate-900: #2F363F;
+  --color-slate-950: #242A34;
+  --color-blue-50: #F4F7E1;
+  --color-blue-100: #EAF0C4;
+  --color-blue-200: #DCE59A;
+  --color-blue-300: #C7D564;
+  --color-blue-400: #B6C83F;
+  --color-blue-500: #7C8A21;
+  --color-blue-600: #5A6516;
+  --color-blue-700: #414912;
+  --color-blue-800: #353B10;
+  --color-blue-900: #2A2F0D;
+
+  /* Structure is square, controls slightly rounded (radius-plate 2px, radius-control 4px). */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
+  --radius-3xl: 6px;
+}
+
+/* ── 月湖 Lake ── */
+html.dp-studio.dark {
+  --dp-surface: #242A34;
+  --dp-surface-1: #1A1F27;
+  --dp-surface-2: #4B5C5F;
+  --dp-surface-card: #2F363F;
+  --dp-on-surface: #FAF9F5;
+  --dp-on-surface-muted: #CBD3D6;
+  --dp-outline: #4B5C5F;
+  --dp-outline-strong: #7D8A8E;
+  --dp-outline-ink: #FAF9F5;
+  --dp-link: #B6C83F;
+  --dp-focus: #A0CCC4;
+  --dp-info: #A0CCC4;
+  --dp-info-bg: #21414A;
+  --dp-error: #EE9A8A;
+  --dp-error-bg: #3A1E1A;
+  --dp-status-bg: #414912;
+  --dp-on-status: #EAF0C4;
+  --dp-note-ink: #FBD08E;
+  --dp-water-line: #A0CCC4;
+
+  --surface-scrim: rgba(10, 12, 16, 0.6);
+  --button-pressed: var(--dp-surface-1);
+  --nav-chip-hover: rgba(250, 249, 245, 0.08);
+  --warning-soft: #3B3020;
+
+  --color-slate-50: #FAF9F5;
+  --color-slate-100: #EEF1F2;
+  --color-slate-200: #CBD3D6;
+  --color-slate-300: #A9B4B8;
+  --color-slate-400: #8D999D;
+  --color-slate-500: #7D8A8E;
+  --color-slate-600: #5E6D71;
+  --color-slate-700: #4B5C5F;
+  --color-slate-800: #343C46;
+  --color-slate-900: #2F363F;
+  --color-slate-950: #242A34;
+  --color-blue-300: #D4DF8A;
+  --color-blue-400: #C7D564;
+  --color-blue-500: #B6C83F;
+  --color-blue-600: #9AAA2C;
+}
+
+html.dp-studio body {
+  background: var(--dp-surface);
+  color: var(--dp-on-surface);
+}
+
+/* Buttons: secondary = paper face with a 1.5px ink edge; primary = leaf face with ink text
+   (white text on leaf would fail contrast). */
+html.dp-studio .action-control { border-width: 1.5px; }
+html.dp-studio .action-control-primary { color: var(--dp-on-primary); font-weight: 700; border-color: transparent; }
+html.dp-studio .action-control-primary svg { color: var(--dp-on-primary); }
+
+/* Shared typography helpers for the studio shell. */
+.dp-display { font-family: var(--dp-font-display); font-weight: 600; letter-spacing: -0.01em; }
+.dp-mono { font-family: var(--dp-font-mono); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+.dp-dot { display: inline-block; width: 0.32em; height: 0.32em; margin-left: 0.12em; border-radius: 999px; background: var(--dp-signature); vertical-align: 0.12em; }
+
+/* Underline tabs with a leaf indicator (Dewpoint Tabs). */
+.dp-tabs { display: flex; gap: 20px; align-items: stretch; }
+.dp-tab {
+  position: relative; display: inline-flex; align-items: center; padding: 10px 0 12px; border: 0; background: none;
+  font-size: 13px; line-height: 18px; color: var(--dp-on-surface-muted); cursor: pointer; white-space: nowrap;
+}
+.dp-tab:hover { color: var(--dp-on-surface); }
+.dp-tab[aria-selected="true"] { color: var(--dp-on-surface); font-weight: 700; }
+.dp-tab[aria-selected="true"]::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--dp-primary);
+}
+.dp-tab:focus-visible { outline: 2px solid var(--dp-focus); outline-offset: 3px; }
+
+/* Ghost copy instead of a drop shadow for floating layers (Dewpoint "flow copy"). */
+.dp-floating { position: relative; isolation: isolate; }
+.dp-floating::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background: var(--dp-ghost); border: 1.5px solid var(--dp-ghost-edge); translate: 10px 8px;
+}
+
+/* Status dot with an optional ripple (the only looping animation). */
+.dp-status-dot { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+.dp-status-dot--ripple::after {
+  content: ""; position: absolute; inset: 0; border-radius: 999px; border: 1.5px solid currentColor;
+  animation: dp-ripple 1600ms cubic-bezier(0.3, 0.7, 0.2, 1) infinite;
+}
+@keyframes dp-ripple { from { transform: scale(1); opacity: 0.8; } to { transform: scale(2.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dp-status-dot--ripple::after { animation: none; }
+  .dp-floating::before { translate: 0 0; }
+}

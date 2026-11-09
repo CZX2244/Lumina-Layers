@@ -1,121 +1,71 @@
 "use strict";
 /**
- * Lumina Studio Plus desktop configuration (userData/plus-config.json).
- * Settings that the backend reads from its environment at start-up: bug
- * report upload and the optional, user-authorised Registry connections.
- * 个人增强版桌面配置：后端启动时从环境变量读取的设置（反馈上传、用户已获授权的 Registry）。
+ * Lumina Studio Plus: local-only backend settings and maintenance helpers.
+ * 个人增强版：仅本地的后端设置与维护辅助。
+ *
+ * The personal build connects to no cloud material/LUT registry and never
+ * uploads bug reports; reports and logs stay on this computer and can be
+ * opened from Settings. Older builds stored registry URLs/tokens in
+ * userData/plus-config.json; those are removed on start-up.
+ * 个人版不连接云端耗材/LUT 库，也不上传反馈；旧版本写入的 Registry 地址和令牌会在启动时清除。
  */
 const fs = require("node:fs");
 const path = require("node:path");
 
 const CONFIG_FILE = "plus-config.json";
-const DEFAULT_CONFIG = Object.freeze({
-  feedbackUpload: false,
-  materialRegistryUrl: "",
-  materialRegistryToken: "",
-  lutRegistryUrl: "",
-  lutRegistryToken: "",
-  updateCheck: true,
-});
+const LEGACY_KEYS = ["materialRegistryUrl", "materialRegistryToken", "lutRegistryUrl", "lutRegistryToken", "feedbackUpload"];
 
-function cleanUrl(value) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 500) return "";
-  try {
-    const url = new URL(trimmed);
-    return url.protocol === "https:" || url.protocol === "http:" ? trimmed.replace(/\/+$/, "") : "";
-  } catch {
-    return "";
-  }
-}
-
-function cleanToken(value) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  return trimmed.length <= 500 && !/[\r\n\0]/.test(trimmed) ? trimmed : "";
-}
-
-function normalizePlusConfig(value) {
-  const raw = value && typeof value === "object" ? value : {};
-  return {
-    feedbackUpload: raw.feedbackUpload === true,
-    materialRegistryUrl: cleanUrl(raw.materialRegistryUrl),
-    materialRegistryToken: cleanToken(raw.materialRegistryToken),
-    lutRegistryUrl: cleanUrl(raw.lutRegistryUrl),
-    lutRegistryToken: cleanToken(raw.lutRegistryToken),
-    updateCheck: raw.updateCheck !== false,
-  };
-}
-
-function readPlusConfig(userData, fileSystem = fs) {
-  try {
-    return normalizePlusConfig(JSON.parse(fileSystem.readFileSync(path.join(userData, CONFIG_FILE), "utf8")));
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
-}
-
-function writePlusConfig(userData, value, fileSystem = fs) {
-  const config = normalizePlusConfig(value);
-  const target = path.join(userData, CONFIG_FILE);
-  const temporary = `${target}.${process.pid}.tmp`;
-  fileSystem.mkdirSync(userData, { recursive: true });
-  fileSystem.writeFileSync(temporary, JSON.stringify(config, null, 2), { mode: 0o600 });
-  fileSystem.renameSync(temporary, target);
-  return config;
+/**
+ * Backend variables for the personal build. Registry variables are never
+ * passed; bug reports stay local unless the user set their own server in the
+ * real environment.
+ * 个人版传给后端的环境变量：不传 Registry；反馈只存本机（除非真实环境变量另有设置）。
+ */
+function plusConfigEnv(env = {}) {
+  return env.LUMINA_FEEDBACK_SERVER_URL ? {} : { LUMINA_FEEDBACK_SERVER_URL: "off" };
 }
 
 /**
- * Backend environment derived from the config. Variables the user already
- * set in the real environment always win.
- * 由配置得出的后端环境变量；真实环境变量中已设置的值优先。
+ * Remove registry URLs/tokens left by an earlier build. Returns true when the
+ * file was rewritten or deleted.
+ * 清除旧版本留下的 Registry 地址与令牌。
  */
-function plusConfigEnv(config, env = {}) {
-  const result = {};
-  const put = (key, value) => {
-    if (env[key]) return;
-    if (value) result[key] = value;
-  };
-  // Bug reports stay local unless the user opts in; "unset" means the
-  // backend's default (official) service.
-  if (!env.LUMINA_FEEDBACK_SERVER_URL && !config.feedbackUpload) result.LUMINA_FEEDBACK_SERVER_URL = "off";
-  put("LUMINA_MATERIAL_REGISTRY_URL", config.materialRegistryUrl);
-  put("LUMINA_MATERIAL_REGISTRY_TOKEN", config.materialRegistryUrl ? config.materialRegistryToken : "");
-  put("LUMINA_LUT_REGISTRY_URL", config.lutRegistryUrl);
-  put("LUMINA_LUT_REGISTRY_TOKEN", config.lutRegistryUrl ? config.lutRegistryToken : "");
-  return result;
+function scrubLegacyPlusConfig(userData, fileSystem = fs) {
+  const file = path.join(userData, CONFIG_FILE);
+  let raw;
+  try {
+    raw = JSON.parse(fileSystem.readFileSync(file, "utf8"));
+  } catch {
+    return false;
+  }
+  if (!raw || typeof raw !== "object" || !LEGACY_KEYS.some((key) => key in raw)) return false;
+  const kept = Object.fromEntries(Object.entries(raw).filter(([key]) => !LEGACY_KEYS.includes(key)));
+  try {
+    if (Object.keys(kept).length === 0) fileSystem.unlinkSync(file);
+    else fileSystem.writeFileSync(file, JSON.stringify(kept, null, 2), { mode: 0o600 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/** Renderer-safe view: tokens are reported as present/absent only. */
-function publicPlusConfig(config) {
-  return {
-    feedbackUpload: config.feedbackUpload,
-    materialRegistryUrl: config.materialRegistryUrl,
-    materialRegistryTokenSet: Boolean(config.materialRegistryToken),
-    lutRegistryUrl: config.lutRegistryUrl,
-    lutRegistryTokenSet: Boolean(config.lutRegistryToken),
-    updateCheck: config.updateCheck,
-  };
+/** Folders the renderer may ask to open (fixed set, resolved in main). */
+const DATA_FOLDER_KINDS = ["feedback", "logs", "data"];
+
+function resolveDataFolder(kind, { userData, distMode, rootDir, desktopLogs }) {
+  switch (kind) {
+    case "feedback":
+      return distMode ? path.join(userData, "feedback") : path.join(rootDir, "feedback");
+    case "logs":
+      return distMode ? path.join(userData, "backend-logs") : desktopLogs;
+    case "data":
+      return userData;
+    default:
+      return null;
+  }
 }
 
-/** Apply a renderer update; an omitted or null token keeps the stored one. */
-function mergePlusConfigUpdate(current, update) {
-  const patch = update && typeof update === "object" ? update : {};
-  const next = { ...current };
-  for (const key of ["feedbackUpload", "updateCheck"]) {
-    if (typeof patch[key] === "boolean") next[key] = patch[key];
-  }
-  for (const key of ["materialRegistryUrl", "lutRegistryUrl"]) {
-    if (typeof patch[key] === "string") next[key] = patch[key];
-  }
-  for (const key of ["materialRegistryToken", "lutRegistryToken"]) {
-    if (typeof patch[key] === "string") next[key] = patch[key];
-  }
-  return normalizePlusConfig(next);
-}
-
-// ── Update check ──────────────────────────────────────────────────
+// ── Update check (manual only) ────────────────────────────────────
 
 /** Compare a published release with this build (ISO timestamps). */
 function isNewerRelease(release, buildInfo) {
@@ -137,13 +87,10 @@ function readBuildInfo(appRoot, fileSystem = fs) {
 }
 
 module.exports = {
-  DEFAULT_CONFIG,
+  DATA_FOLDER_KINDS,
   isNewerRelease,
-  mergePlusConfigUpdate,
-  normalizePlusConfig,
   plusConfigEnv,
-  publicPlusConfig,
   readBuildInfo,
-  readPlusConfig,
-  writePlusConfig,
+  resolveDataFolder,
+  scrubLegacyPlusConfig,
 };

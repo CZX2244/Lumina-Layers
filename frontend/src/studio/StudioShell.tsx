@@ -3,7 +3,8 @@
  * project actions, page content and a status bar.
  * 个人增强版外壳：标题栏、按任务分组的侧栏、带工程操作的页头、页面内容和状态栏。
  */
-import { Suspense, useCallback, useMemo, useState, type CSSProperties } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import "./dewpoint.css";
 import { Bars3Icon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useI18n } from "../i18n/context";
 import { useWidgetStore } from "../stores/widgetStore";
@@ -18,10 +19,8 @@ import CalibrationPanel from "../components/CalibrationPanel";
 import ExtractorPanel from "../components/ExtractorPanel";
 import GradientCardGeneratePanel from "../components/GradientCardGeneratePanel";
 import GradientCardExtractPanel from "../components/GradientCardExtractPanel";
-import MaterialCloudSyncPanel from "../components/MaterialCloudSyncPanel";
 import MaterialLibraryPanel from "../components/MaterialLibraryPanel";
 import MaterialRecipeQueryPanel from "../components/MaterialRecipeQueryPanel";
-import LutCloudSyncPanel from "../components/LutCloudSyncPanel";
 import LutLibraryPanel from "../components/LutLibraryPanel";
 import LutComparePanel from "../components/LutComparePanel";
 import LutManagerPanel from "../components/LutManagerPanel";
@@ -39,7 +38,7 @@ import { buildStudioCommands } from "./commands";
 import { findNavItem, navigateStudio, sectionTabsOf } from "./navigation";
 import { useStudioPrefsStore } from "./studioPrefsStore";
 import { useStudioInput } from "./useStudioInput";
-import { useDesktopIntegration } from "./desktop";
+import { plusDesktop, useDesktopIntegration } from "./desktop";
 import { PlusSettings } from "./settings/PlusSettings";
 
 export interface StudioShellProps {
@@ -63,27 +62,35 @@ function titleBarStyle(): CSSProperties | undefined {
   return undefined;
 }
 
-function SegmentedTabs({ items, active, onSelect, testIdPrefix }: {
+function UnderlineTabs({ items, active, onSelect, testIdPrefix, label }: {
   items: { id: string; label: string }[];
   active: string;
   onSelect: (id: string) => void;
   testIdPrefix: string;
+  label: string;
 }) {
   return (
-    <div role="tablist" className="flex shrink-0 rounded-lg bg-slate-300/60 p-0.5 dark:bg-slate-800">
+    <div
+      role="tablist"
+      aria-label={label}
+      className="dp-tabs self-stretch"
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        const index = items.findIndex((item) => item.id === active);
+        const next = items[(index + (event.key === "ArrowRight" ? 1 : items.length - 1)) % items.length];
+        if (next) onSelect(next.id);
+      }}
+    >
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           role="tab"
+          tabIndex={item.id === active ? 0 : -1}
           aria-selected={item.id === active}
           data-testid={`${testIdPrefix}-${item.id}`}
           onClick={() => onSelect(item.id)}
-          className={`rounded-md px-3 py-1 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
-            item.id === active
-              ? "bg-[var(--surface-panel-strong)] text-slate-900 shadow-sm dark:text-white"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-          }`}
+          className="dp-tab"
         >
           {item.label}
         </button>
@@ -104,13 +111,14 @@ function PageHeader() {
   const found = findNavItem(activeTab);
   const sections = sectionTabsOf(activeTab);
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-w-0 items-center gap-6 self-stretch">
       <h1 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
         {found?.group && <span className="font-normal text-[var(--surface-text-muted)]">{t(found.group.labelKey)} / </span>}
         {found ? t(found.item.labelKey) : t(`tab.${activeTab}`)}
       </h1>
       {activeTab === "converter" && (
-        <SegmentedTabs
+        <UnderlineTabs
+          label={t("studio.mode.label")}
           testIdPrefix="studio-mode"
           active={subTab === "color" ? "color" : "core"}
           onSelect={(id) => setSubTab(id === "color" ? "color" : "core")}
@@ -118,7 +126,8 @@ function PageHeader() {
         />
       )}
       {sections && (
-        <SegmentedTabs
+        <UnderlineTabs
+          label={t("studio.section.label")}
           testIdPrefix="studio-section"
           active={activeTab}
           onSelect={(id) => navigateStudio(id as typeof activeTab)}
@@ -134,16 +143,16 @@ function StatusBar({ backendStatus }: { backendStatus: StudioShellProps["backend
   const busy = useConverterStore((state) => state.isLoading || state.isGenerating || state.batchLoading);
   const bed = useConverterStore((state) => state.bed_label);
   const printer = useSettingsStore((state) => state.printerModel);
-  const dot = backendStatus === "ok" ? "bg-emerald-500" : backendStatus === "checking" ? "bg-amber-400" : "bg-red-500";
+  const dotColor = backendStatus === "ok" ? "text-[var(--dp-link)]" : backendStatus === "checking" ? "text-[var(--dp-water-line)]" : "text-[var(--dp-error)]";
   return (
     <footer data-testid="studio-statusbar" className="flex h-7 shrink-0 items-center gap-4 border-t panel-divider bg-slate-200 px-3 text-[11px] text-slate-600 dark:bg-slate-950 dark:text-slate-400">
       <span className="inline-flex items-center gap-1.5">
-        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${dot}`} />
-        {t(`studio.status.backend_${backendStatus}`)}
+        <span aria-hidden="true" className={`dp-status-dot ${dotColor} ${backendStatus === "checking" ? "dp-status-dot--ripple" : ""}`} />
+        <span className={backendStatus === "fail" ? "text-[var(--dp-error)]" : undefined}>{t(`studio.status.backend_${backendStatus}`)}</span>
       </span>
-      {busy && <span className="inline-flex items-center gap-1.5" role="status"><span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />{t("studio.status.working")}</span>}
+      {busy && <span className="inline-flex items-center gap-1.5" role="status"><span aria-hidden="true" className="dp-status-dot dp-status-dot--ripple text-[var(--dp-water-line)]" />{t("studio.status.working")}</span>}
       <span className="ml-auto truncate">{[printer, bed].filter(Boolean).join(" · ")}</span>
-      <span className="hidden sm:inline">{t("studio.status.palette_hint")}</span>
+      <span className="dp-mono hidden text-[11px] normal-case tracking-normal sm:inline">{t("studio.status.palette_hint")}</span>
     </footer>
   );
 }
@@ -153,7 +162,7 @@ function SavedFileToast() {
   const { notice, dismiss, reveal } = useDesktopIntegration();
   if (!notice) return null;
   return (
-    <div role="status" data-testid="studio-saved-toast" className="fixed bottom-10 right-4 z-[120] flex max-w-sm items-center gap-3 rounded-xl border panel-divider bg-[var(--surface-panel-strong)] px-4 py-3 text-sm shadow-lg">
+    <div role="status" data-testid="studio-saved-toast" className="dp-floating fixed bottom-12 right-6 z-[120] flex max-w-sm items-center gap-3 rounded-[2px] border panel-divider bg-[var(--dp-surface-card)] px-4 py-3 text-sm">
       <span className="min-w-0 flex-1 truncate">{t("studio.saved.title").replace("{name}", notice.name)}</span>
       <button type="button" onClick={reveal} className="shrink-0 font-medium text-[var(--nav-tab-selected-bg)] hover:underline">{t("studio.saved.reveal")}</button>
       <button type="button" onClick={dismiss} aria-label={t("common_close")} className="shrink-0 text-slate-400 hover:text-slate-700"><XMarkIcon aria-hidden="true" className="h-4 w-4" /></button>
@@ -173,7 +182,6 @@ function PageContent({ suspended }: { suspended: boolean }) {
       {activeTab === "gradient-card-generate" && <GradientCardGeneratePanel />}
       {activeTab === "gradient-card-extract" && <GradientCardExtractPanel />}
       {activeTab === "material-library" && <MaterialLibraryPanel />}
-      {activeTab === "material-cloud-sync" && <MaterialCloudSyncPanel />}
       {activeTab === "material-recipe" && <MaterialRecipeQueryPanel />}
       {activeTab === "extractor" && (
         <div className="flex h-full min-h-0 flex-col xl:flex-row">
@@ -185,7 +193,6 @@ function PageContent({ suspended }: { suspended: boolean }) {
       )}
       {activeTab === "lut-library" && <LutLibraryPanel />}
       {activeTab === "lut-manager" && <LutManagerPanel />}
-      {activeTab === "lut-cloud-sync" && <LutCloudSyncPanel />}
       {activeTab === "lut-details" && <LutDetailsPanel />}
       {activeTab === "lut-compare" && <LutComparePanel />}
       {activeTab === "five-color" && <div className="flex h-full min-h-0"><FiveColorQueryPanel /></div>}
@@ -216,6 +223,15 @@ export function StudioShell({ backendStatus, reproTicketId, onReportBug, onOpenA
     [onOpenAbout, onReportBug, openShortcuts],
   );
   useStudioInput({ openPalette, openShortcuts });
+  // 露点 theme for the shell and the dialogs it portals into <body>.
+  useEffect(() => {
+    document.documentElement.classList.add("dp-studio");
+    plusDesktop()?.setTitlebarPalette?.("studio");
+    return () => {
+      document.documentElement.classList.remove("dp-studio");
+      plusDesktop()?.setTitlebarPalette?.("classic");
+    };
+  }, []);
   const mergedTitlebar = electronAPI?.platform === "darwin" || electronAPI?.platform === "win32";
 
   return (
@@ -242,7 +258,7 @@ export function StudioShell({ backendStatus, reproTicketId, onReportBug, onOpenA
           >
             <MagnifyingGlassIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{t("studio.palette.placeholder")}</span>
-            <kbd className="rounded border panel-divider px-1.5 text-[10px]">{t("studio.kbd.palette")}</kbd>
+            <kbd className="dp-mono rounded-[2px] border panel-divider px-1.5 text-[10px] tracking-normal">{t("studio.kbd.palette")}</kbd>
           </button>
         </div>
         <div className="desktop-titlebar-controls flex items-center">

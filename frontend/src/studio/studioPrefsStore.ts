@@ -9,6 +9,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useWidgetStore } from "../stores/widgetStore";
+import type { TabId } from "../types/widget";
+
+/** Cloud library pages are disabled in the personal build; mirrors navigation.ts. */
+export const CLOUD_TAB_FALLBACK: Partial<Record<TabId, TabId>> = {
+  "material-cloud-sync": "material-library",
+  "lut-cloud-sync": "lut-library",
+};
 
 export type UiShell = "studio" | "classic";
 export type StudioView = "home" | "app";
@@ -68,7 +75,18 @@ export const useStudioPrefsStore = create<StudioPrefsState>()(
 // 任何经由 widgetStore 的跳转（工程、分享卡、教程、工坊回传、页面内链接）都会离开首页。
 useWidgetStore.subscribe(
   (state) => state.activeTab,
-  () => {
+  (tab) => {
+    const local = CLOUD_TAB_FALLBACK[tab];
+    if (local) {
+      useWidgetStore.getState().setActiveTab(local);
+      return;
+    }
     if (useStudioPrefsStore.getState().view !== "app") useStudioPrefsStore.getState().showApp();
   },
 );
+
+// A layout saved before the cloud pages were disabled may still point at one.
+{
+  const restored = CLOUD_TAB_FALLBACK[useWidgetStore.getState().activeTab];
+  if (restored) useWidgetStore.getState().setActiveTab(restored);
+}

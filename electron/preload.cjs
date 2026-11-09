@@ -60,9 +60,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     showItemInFolder: (filePath) => ipcRenderer.invoke("plus-show-item-in-folder", filePath),
     setDownloadNaming: (template, context) => ipcRenderer.send("plus-set-download-naming", { template, context }),
     setTaskbarProgress: (state) => ipcRenderer.send("plus-set-taskbar-progress", state),
-    getConfig: () => ipcRenderer.invoke("plus-get-config"),
-    setConfig: (update) => ipcRenderer.invoke("plus-set-config", update),
-    relaunch: () => ipcRenderer.invoke("plus-relaunch"),
+    openDataFolder: (kind) => ipcRenderer.invoke("plus-open-data-folder", kind),
+    setTitlebarPalette: (palette) => ipcRenderer.send("plus-set-titlebar-palette", palette),
     checkUpdate: () => ipcRenderer.invoke("plus-check-update"),
     openRelease: (url) => ipcRenderer.invoke("plus-open-release", url),
     onDownloadDone: (listener) => {

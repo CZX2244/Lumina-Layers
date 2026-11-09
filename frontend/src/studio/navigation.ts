@@ -11,7 +11,7 @@
 import type { TabId } from "../types/widget";
 import { useWidgetStore } from "../stores/widgetStore";
 import { useSingleStageStore } from "../stores/singleStageStore";
-import { useStudioPrefsStore } from "./studioPrefsStore";
+import { CLOUD_TAB_FALLBACK, useStudioPrefsStore } from "./studioPrefsStore";
 
 export type StudioIcon =
   | "home" | "image" | "vector" | "workshop" | "library" | "card" | "flask"
@@ -48,7 +48,6 @@ export const STUDIO_NAV_GROUPS: StudioNavGroup[] = [
       { tab: "material-library", labelKey: "tab.materialLibrary", icon: "library", keywords: "filament material 耗材 档案" },
       { tab: "gradient-card-generate", labelKey: "studio.nav.material_profile", icon: "card", keywords: "gradient card calibrate 色卡 建档 梯度" },
       { tab: "material-recipe", labelKey: "studio.nav.material_recipe", icon: "flask", keywords: "recipe 配方 耗材" },
-      { tab: "material-cloud-sync", labelKey: "tab.materialCloudSync", icon: "cloud", keywords: "cloud registry 云" },
     ],
   },
   {
@@ -60,7 +59,6 @@ export const STUDIO_NAV_GROUPS: StudioNavGroup[] = [
       { tab: "lut-details", labelKey: "studio.nav.lut_analyze", icon: "chart", keywords: "details compare analyze 分析 对比 详情" },
       { tab: "five-color", labelKey: "studio.nav.five_color", icon: "palette", keywords: "five color query 五色 查询 配方" },
       { tab: "lut-manager", labelKey: "tab.lutManager", icon: "merge", keywords: "merge lut 合并" },
-      { tab: "lut-cloud-sync", labelKey: "tab.lutCloudSync", icon: "cloud", keywords: "cloud 云" },
     ],
   },
 ];
@@ -97,6 +95,15 @@ export const STUDIO_PAGE_SECTIONS: { owner: TabId; tabs: { tab: TabId; labelKey:
   },
 ];
 
+/**
+ * Cloud library pages are disabled in the personal build (no registry
+ * service). Any route into them lands on the matching local library.
+ * 个人版停用云库页面；任何跳转都落到对应的本地库。
+ */
+export function localTabFor(tab: TabId): TabId {
+  return CLOUD_TAB_FALLBACK[tab] ?? tab;
+}
+
 /** The sidebar entry that represents a tab (pages inside a section map to its owner). */
 export function navOwnerOf(tab: TabId): TabId {
   const section = STUDIO_PAGE_SECTIONS.find((entry) => entry.tabs.some((item) => item.tab === tab));
@@ -132,6 +139,6 @@ export function navigateStudio(tab: TabId): void {
     // Same behaviour as the classic nav: a fresh extraction starts clean.
     useSingleStageStore.getState().clearMaterialVerification();
   }
-  widgets.setActiveTab(tab);
+  widgets.setActiveTab(localTabFor(tab));
   useStudioPrefsStore.getState().showApp();
 }

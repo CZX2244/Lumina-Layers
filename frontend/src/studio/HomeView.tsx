@@ -23,7 +23,7 @@ import { navigateStudio } from "./navigation";
 import { requestProjectCommand } from "./projectCommands";
 import { useStudioPrefsStore } from "./studioPrefsStore";
 import { openImagesInConverter } from "./useStudioInput";
-import { goToWorkbenchStep } from "./commands";
+import { clickStudioControl, goToWorkbenchStep } from "./commands";
 import { ProductTemplates } from "./templates/ProductTemplates";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/bmp,image/gif,image/heic,image/heif,image/svg+xml,.svg,.heic,.heif";
@@ -49,15 +49,9 @@ function ChecklistRow({ state, title, detail, action }: { state: CheckState; tit
   );
 }
 
-function SmallButton({ label, onClick, primary = false }: { label: string; onClick: () => void; primary?: boolean }) {
+function SmallButton({ label, onClick, testId }: { label: string; onClick: () => void; testId?: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
-        primary ? "bg-[var(--button-primary)] text-white hover:opacity-90" : "action-control"
-      }`}
-    >
+    <button type="button" data-testid={testId} onClick={onClick} className="action-control shrink-0 rounded-[4px] px-3 py-1.5 text-xs font-medium">
       {label}
     </button>
   );
@@ -83,9 +77,10 @@ function FirstRunChecklist() {
   useEffect(() => { if (!slicers.length && !detecting) void detect(); }, [detect, detecting, slicers.length]);
 
   const usingMaterials = sourceVersion === "material";
+  const lutSelected = useConverterStore((state) => state.lut_names.length > 0 || Boolean(state.lut_name));
   const colorState: CheckState = usingMaterials
     ? materialCount === null ? "unknown" : materialCount > 0 ? "done" : "todo"
-    : lutCount > 0 ? "done" : "unknown";
+    : lutSelected ? "done" : lutCount > 0 ? "todo" : "unknown";
   const slicerState: CheckState = detecting ? "unknown" : slicers.length > 0 ? "done" : "todo";
 
   return (
@@ -109,16 +104,24 @@ function FirstRunChecklist() {
         <ChecklistRow
           state={colorState}
           title={t("studio.home.check_color")}
-          detail={usingMaterials
-            ? materialCount === 0 ? t("studio.home.check_color_empty") : t("studio.home.check_color_materials").replace("{count}", String(materialCount ?? "…"))
-            : t("studio.home.check_color_lut")}
-          action={usingMaterials && materialCount === 0 ? (
-            <div className="flex shrink-0 flex-col gap-1.5">
-              <SmallButton primary label={t("studio.home.use_lut")} onClick={() => { setSourceVersion("legacy"); goToWorkbenchStep("color"); }} />
-              <SmallButton label={t("studio.home.make_profile")} onClick={() => navigateStudio("gradient-card-generate")} />
+          detail={colorState === "done"
+            ? usingMaterials ? t("studio.home.check_color_materials").replace("{count}", String(materialCount ?? 0)) : t("studio.home.check_color_lut")
+            : t("studio.home.check_color_empty")}
+          action={colorState === "done" ? undefined : (
+            <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+              <SmallButton testId="studio-path-builtin" label={t("studio.home.path_builtin")} onClick={() => {
+                if (useConverterStore.getState().source_version !== "legacy") setSourceVersion("legacy");
+                goToWorkbenchStep("color");
+                window.setTimeout(() => clickStudioControl('[data-tutorial="color-source"] button[aria-haspopup="dialog"], [data-tutorial="color-source"] [data-lut-picker-trigger]'), 400);
+              }} />
+              <SmallButton testId="studio-path-import" label={t("studio.home.path_import")} onClick={() => navigateStudio("lut-library")} />
+              <SmallButton testId="studio-path-calibrate" label={t("studio.home.path_calibrate")} onClick={() => navigateStudio("gradient-card-generate")} />
             </div>
-          ) : undefined}
+          )}
         />
+        {colorState !== "done" && (
+          <li className="pb-3 pl-8 text-xs leading-5 text-[var(--surface-text-muted)]">{t("studio.home.preset_scope")}</li>
+        )}
         <ChecklistRow
           state={slicerState}
           title={t("studio.home.check_slicer")}
@@ -188,17 +191,18 @@ export function HomeView() {
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-8">
         <section
           aria-labelledby="studio-home-start"
-          className="rounded-2xl border-2 border-dashed border-slate-300 bg-[var(--surface-panel-strong)] px-6 py-10 text-center dark:border-slate-700"
+          className="rounded-[2px] border-[1.5px] border-dashed border-[var(--dp-outline-strong)] bg-[var(--dp-surface-card)] px-6 py-10 text-center"
         >
-          <ArrowUpTrayIcon aria-hidden="true" className="mx-auto h-10 w-10 text-slate-400" />
-          <h1 id="studio-home-start" className="mt-3 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{t("studio.home.start_title")}</h1>
+          <ArrowUpTrayIcon aria-hidden="true" className="mx-auto h-9 w-9 text-[var(--dp-on-surface-muted)]" />
+          <p className="dp-mono mt-3 text-[12px] text-[var(--surface-text-muted)]">{t("studio.home.eyebrow")}</p>
+          <h1 id="studio-home-start" className="dp-display mt-2 text-[34px] leading-tight text-[var(--dp-on-surface)]">{t("studio.home.start_title")}<span aria-hidden="true" className="dp-dot" /></h1>
           <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--surface-text-muted)]">{t("studio.home.start_detail")}</p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               data-testid="studio-home-pick-image"
               onClick={() => fileInput.current?.click()}
-              className="rounded-lg bg-[var(--button-primary)] px-5 py-2.5 text-sm font-semibold text-white outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+              className="action-control action-control-primary inline-flex h-11 items-center rounded-[4px] px-5 text-sm"
             >
               {t("studio.home.pick_image")}
             </button>

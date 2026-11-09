@@ -8,32 +8,13 @@ import { useConverterStore } from "../stores/converter";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useStudioPrefsStore } from "./studioPrefsStore";
 
-export interface PlusConfigView {
-  feedbackUpload: boolean;
-  materialRegistryUrl: string;
-  materialRegistryTokenSet: boolean;
-  lutRegistryUrl: string;
-  lutRegistryTokenSet: boolean;
-  updateCheck: boolean;
-}
-
-export interface PlusConfigUpdate {
-  feedbackUpload?: boolean;
-  updateCheck?: boolean;
-  materialRegistryUrl?: string;
-  materialRegistryToken?: string;
-  lutRegistryUrl?: string;
-  lutRegistryToken?: string;
-}
-
 export type UpdateCheckResult =
   | { status: "available"; tag: string; url: string }
   | { status: "current" | "none" | "unknown" | "error" };
 
 export interface PlusDesktopBridge {
-  getConfig: () => Promise<{ config: PlusConfigView; managed: boolean } | null>;
-  setConfig: (update: PlusConfigUpdate) => Promise<{ config: PlusConfigView; managed: boolean } | null>;
-  relaunch: () => Promise<boolean>;
+  openDataFolder: (kind: "feedback" | "logs" | "data") => Promise<boolean>;
+  setTitlebarPalette?: (palette: "studio" | "classic") => void;
   checkUpdate: () => Promise<UpdateCheckResult | null>;
   openRelease: (url: string) => Promise<boolean>;
   showItemInFolder: (filePath: string) => Promise<boolean>;

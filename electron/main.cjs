@@ -32,13 +32,12 @@ const {
   taskbarProgressValue,
 } = require("./plus-desktop.cjs");
 const {
+  DATA_FOLDER_KINDS,
   isNewerRelease,
-  mergePlusConfigUpdate,
   plusConfigEnv,
-  publicPlusConfig,
   readBuildInfo,
-  readPlusConfig,
-  writePlusConfig,
+  resolveDataFolder,
+  scrubLegacyPlusConfig,
 } = require("./plus-config.cjs");
 const PLUS_UPDATE_REPO = process.env.LUMINA_PLUS_UPDATE_REPO || "CZX2244/Lumina-Layers";
 const { createApplicationMenu } = require("./application-menu.cjs");
@@ -416,7 +415,7 @@ function backendRuntimeEnv() {
     const userData = app.getPath("userData");
     Object.assign(env, distDataEnv({ userData, env: process.env }), {
       LUMINA_FRONTEND_DIST_DIR: RUNTIME_LAYOUT.frontendDistDir,
-    }, plusConfigEnv(readPlusConfig(userData), process.env));
+    }, plusConfigEnv(process.env));
   }
   return env;
 }
@@ -679,7 +678,7 @@ function createWindow() {
     ...(process.platform === "win32" ? {
       titleBarStyle: "hidden",
       autoHideMenuBar: true,
-      titleBarOverlay: { color: "#e2e8f0", symbolColor: "#334155", height: 40 },
+      titleBarOverlay: { color: STUDIO_TITLE_BAR_OVERLAYS.light.color, symbolColor: STUDIO_TITLE_BAR_OVERLAYS.light.symbolColor, height: 40 },
     } : {}),
     icon: fs.existsSync(ICON_PATH) ? ICON_PATH : undefined,
     webPreferences: {
@@ -906,14 +905,35 @@ const TITLE_BAR_OVERLAYS = {
   light: { color: "#e2e8f0", symbolColor: "#334155", scrimmed: "#6c7381", scrimmedSymbolColor: "#0f172a" },
   dark: { color: "#020617", symbolColor: "#cbd5e1", scrimmed: "#020617", scrimmedSymbolColor: "#64748b" },
 };
+// Lumina Studio Plus shell (露点 Dewpoint 3): warm paper / lake title bar.
+const STUDIO_TITLE_BAR_OVERLAYS = {
+  light: { color: "#E8E6DC", symbolColor: "#141413", scrimmed: "#8E8C85", scrimmedSymbolColor: "#141413" },
+  dark: { color: "#242A34", symbolColor: "#FAF9F5", scrimmed: "#16191F", scrimmedSymbolColor: "#7D8A8E" },
+};
+let titleBarPalette = "classic";
+let titleBarState = { theme: "light", scrimmed: false };
+
+function applyTitleBarOverlay() {
+  if (process.platform !== "win32" || !win || win.isDestroyed()) return;
+  const overlays = titleBarPalette === "studio" ? STUDIO_TITLE_BAR_OVERLAYS : TITLE_BAR_OVERLAYS;
+  const overlay = overlays[titleBarState.theme];
+  win.setTitleBarOverlay(titleBarState.scrimmed
+    ? { color: overlay.scrimmed, symbolColor: overlay.scrimmedSymbolColor }
+    : { color: overlay.color, symbolColor: overlay.symbolColor });
+}
 
 ipcMain.on("set-titlebar-theme", (event, theme, scrimmed) => {
   if (process.platform !== "win32" || !isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return;
   if (theme !== "light" && theme !== "dark") return;
-  const overlay = TITLE_BAR_OVERLAYS[theme];
-  win.setTitleBarOverlay(scrimmed === true
-    ? { color: overlay.scrimmed, symbolColor: overlay.scrimmedSymbolColor }
-    : { color: overlay.color, symbolColor: overlay.symbolColor });
+  titleBarState = { theme, scrimmed: scrimmed === true };
+  applyTitleBarOverlay();
+});
+
+ipcMain.on("plus-set-titlebar-palette", (event, palette) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return;
+  if (palette !== "studio" && palette !== "classic") return;
+  titleBarPalette = palette;
+  applyTitleBarOverlay();
 });
 
 ipcMain.handle("align-traffic-lights", (event, centerY, controlsHeight) => {
@@ -1007,24 +1027,14 @@ ipcMain.on("plus-set-download-naming", (event, payload) => {
   };
 });
 
-ipcMain.handle("plus-get-config", (event) => {
-  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return null;
-  return { config: publicPlusConfig(readPlusConfig(app.getPath("userData"))), managed: DIST_MODE };
-});
-
-ipcMain.handle("plus-set-config", (event, update) => {
-  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return null;
-  const userData = app.getPath("userData");
-  const config = writePlusConfig(userData, mergePlusConfigUpdate(readPlusConfig(userData), update));
-  return { config: publicPlusConfig(config), managed: DIST_MODE };
-});
-
-ipcMain.handle("plus-relaunch", (event) => {
-  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl)) return false;
-  isQuitting = true;
-  app.relaunch();
-  app.quit();
-  return true;
+ipcMain.handle("plus-open-data-folder", async (event, kind) => {
+  if (!isTrustedMainFrameSender(event, win, trustedMainFrameUrl) || !DATA_FOLDER_KINDS.includes(kind)) return false;
+  const folder = resolveDataFolder(kind, {
+    userData: app.getPath("userData"), distMode: DIST_MODE, rootDir: ROOT_DIR, desktopLogs: app.getPath("logs"),
+  });
+  if (!folder) return false;
+  try { fs.mkdirSync(folder, { recursive: true }); } catch (_) { return false; }
+  return (await shell.openPath(folder)) === "";
 });
 
 ipcMain.handle("plus-check-update", async (event) => {
@@ -1177,6 +1187,7 @@ app.whenReady().then(async () => {
   if (!gotLock) return;
   initLog();
   logSys("Lumina Studio Electron starting...");
+  if (scrubLegacyPlusConfig(app.getPath("userData"))) logSys("Removed legacy registry settings from plus-config.json");
   // 让 about 面板 / app.getName() / 部分 macOS 系统提示显示正确的名字。
   app.setName("Lumina Studio 2");
   if (IS_MAC) {

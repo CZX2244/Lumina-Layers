@@ -123,7 +123,7 @@ const CONVERTER_SUB_TAB_LIST: { id: ConverterSubTabId; titleKey: string }[] = [
 
 const LUT_SECONDARY_TAB_LIST: { id: LutSubTabId; titleKey: string }[] = [
   { id: 'lut-library', titleKey: 'tab.lutLibrary' },
-  { id: 'lut-cloud-sync', titleKey: 'tab.lutCloudSync' },
+  // Lumina Studio Plus: cloud LUT library hidden (no registry service).
   { id: 'calibration', titleKey: 'tab.calibration' },
   { id: 'extractor', titleKey: 'tab.extractor' },
   { id: 'lut-details', titleKey: 'tab.lutDetails' },
@@ -133,7 +133,7 @@ const LUT_SECONDARY_TAB_LIST: { id: LutSubTabId; titleKey: string }[] = [
 
 const MATERIAL_SECONDARY_TAB_LIST: { id: MaterialSubTabId; titleKey: string }[] = [
   { id: 'material-library', titleKey: 'tab.materialLibrary' },
-  { id: 'material-cloud-sync', titleKey: 'tab.materialCloudSync' },
+  // Lumina Studio Plus: cloud material library hidden (no registry service).
   { id: 'gradient-card-generate', titleKey: 'tab.gradientCardGenerate' },
   { id: 'gradient-card-extract', titleKey: 'tab.gradientCardExtract' },
   { id: 'material-recipe', titleKey: 'tab.materialRecipe' },

@@ -8,7 +8,7 @@ import { cardPadClass, settingsGroupHeadingClass, workstationInputClass } from "
 import { useStudioPrefsStore } from "../studioPrefsStore";
 import { plusDesktop } from "../desktop";
 import { StorageSettings } from "./StorageSettings";
-import { OnlineSettings } from "./OnlineSettings";
+import { DiagnosticsSettings } from "./DiagnosticsSettings";
 
 export function PlusSettings() {
   const { t } = useI18n();
@@ -75,7 +75,7 @@ export function PlusSettings() {
         </div>
 
         <StorageSettings />
-        <OnlineSettings />
+        <DiagnosticsSettings />
       </div>
     </section>
   );
