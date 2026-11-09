@@ -47,7 +47,8 @@ export function useStudioInput({ openPalette, openShortcuts }: { openPalette: ()
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) return;
+      // Never steal keys from an IME composition (Chinese/Japanese input).
+      if (event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229) return;
       const ctrl = event.ctrlKey || event.metaKey;
       const key = event.key.toLowerCase();
       if (ctrl && !event.shiftKey && !event.altKey && key === "k") {

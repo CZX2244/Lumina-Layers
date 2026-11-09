@@ -187,20 +187,17 @@ export function resolveFridgeMagnetSpacerThick(
   enableFridgeMagnet: boolean,
   fridgeMagnets: FridgeMagnetItem[],
 ): number {
-  const shellLayers = Math.max(
-    1,
-    Math.round(FRIDGE_MAGNET_SPACER_CLEARANCE_MM / FRIDGE_MAGNET_LAYER_HEIGHT_MM),
-  );
-  const requiredSpacerThick = enableFridgeMagnet
-    ? fridgeMagnets.reduce(
-        (maxThickness, item) =>
-          Math.max(
-            maxThickness,
-            (shellLayers + Math.max(1, Math.round(item.thickness_mm / FRIDGE_MAGNET_LAYER_HEIGHT_MM)))
-              * FRIDGE_MAGNET_LAYER_HEIGHT_MM,
-          ),
-        0,
-      )
+  // Mirror the generation request validator in api/schemas/converter.py:
+  // ceil((deepest magnet + shell) / layer) * layer. Matching it keeps the
+  // preview, the settings readout and the generated 3MF on the same backing.
+  // 与后端生成请求校验一致，保证预览、设置显示与生成的 3MF 底板厚度相同。
+  const requiredSpacerThick = enableFridgeMagnet && fridgeMagnets.length > 0
+    ? Math.round(
+        Math.ceil(
+          (Math.max(...fridgeMagnets.map((item) => item.thickness_mm)) + FRIDGE_MAGNET_SPACER_CLEARANCE_MM)
+            / FRIDGE_MAGNET_LAYER_HEIGHT_MM - 1e-9,
+        ) * FRIDGE_MAGNET_LAYER_HEIGHT_MM * 1e10,
+      ) / 1e10
     : 0;
 
   return clampFridgeMagnetValue(

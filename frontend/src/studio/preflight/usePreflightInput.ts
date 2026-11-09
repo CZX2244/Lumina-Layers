@@ -10,6 +10,7 @@ export function usePreflightInput(): PreflightInput {
       hasImage: Boolean(s.imageFile) || (s.batchMode && s.batchFiles.length > 0),
       widthMm: s.target_width_mm,
       heightMm: s.target_height_mm,
+      baseBackingMm: s.base_spacer_thick,
       backingMm: s.spacer_thick,
       backingInfillPercent: s.backing_infill_density_percent,
       bed: s.bedSizes.find((bed) => bed.label === s.bed_label) ?? null,

@@ -139,6 +139,25 @@ export const studioTranslations = {
   "studio.shortcut.original": { zh: "调色时按住查看原图", en: "Hold while recoloring to see the original" },
   "studio.shortcut.leave_color": { zh: "退出调色，回到 3D 预览", en: "Leave recoloring, back to 3D preview" },
 
+  // Assembly reference sheet
+  "studio.assembly.save": { zh: "保存装配参考图（{count} 块）", en: "Save assembly reference ({count} parts)" },
+  "studio.assembly.saving": { zh: "正在生成参考图…", en: "Drawing the reference…" },
+  "studio.assembly.hint": { zh: "PNG 图上标出每一块的编号、位置和尺寸，编号和导出文件里的名字一致。", en: "A PNG showing each part's label, position and size; labels match the exported file names." },
+  "studio.assembly.need_image": { zh: "先导入图片并生成预览，才能画参考图。", en: "Import an image and preview it first." },
+  "studio.assembly.need_size": { zh: "分块尺寸无效。检查成品宽高和分块宽高都大于 0。", en: "The tile size is invalid. Check that the piece and tile sizes are above 0." },
+  "studio.assembly.need_puzzle_preview": { zh: "拼图布局还没算出来。先生成一次预览，拿到实际的行列数后再保存。", en: "The puzzle layout is not ready. Preview once to get the actual rows and columns, then save." },
+  "studio.assembly.saved": { zh: "参考图已保存", en: "Reference saved" },
+  "studio.assembly.failed": { zh: "参考图没有保存成功。预览图可能已过期，重新预览后再试。", en: "The reference could not be saved. The preview may be stale; preview again and retry." },
+  "studio.assembly.title_tiles": { zh: "大画幅装配参考", en: "Large-format assembly reference" },
+  "studio.assembly.title_puzzle": { zh: "拼图装配参考", en: "Puzzle assembly reference" },
+  "studio.assembly.subtitle": { zh: "{rows} 行 × {cols} 列 · 共 {count} 块", en: "{rows} rows × {cols} columns · {count} parts" },
+  "studio.assembly.orientation": { zh: "图片上方", en: "Top of the picture" },
+  "studio.assembly.total": { zh: "成品 {w} × {h} mm", en: "Overall {w} × {h} mm" },
+  "studio.assembly.legend_tiles": { zh: "ZIP 中的文件与尺寸", en: "Files in the ZIP and their sizes" },
+  "studio.assembly.legend_puzzle": { zh: "3MF 中的拼图块与名义尺寸", en: "Puzzle pieces in the 3MF and nominal sizes" },
+  "studio.assembly.footnote_tiles": { zh: "从左上角开始按行编号：R 是行，C 是列。最后一行和最后一列保留余下的尺寸。", en: "Numbered row by row from the top-left: R is the row, C the column. The last row and column keep the remainder." },
+  "studio.assembly.footnote_puzzle": { zh: "编号按行（字母）和列（数字）排列，切线以图上实线为准；异形拼图的尺寸是名义值。", en: "Labels are row letter plus column number; cut lines follow the drawn lines. Sizes of irregular pieces are nominal." },
+
   // Status bar & saved toast
   "studio.status.backend_ok": { zh: "后端已连接", en: "Backend connected" },
   "studio.status.backend_checking": { zh: "正在连接后端…", en: "Connecting to backend…" },
@@ -163,11 +182,12 @@ export const studioTranslations = {
 
   // Storage
   "studio.storage.title": { zh: "存储占用", en: "Storage" },
-  "studio.storage.detail": { zh: "勾选要清理的类别。耗材档案、LUT 和工程文件不在这里，不会被删除。", en: "Pick categories to clean. Filament profiles, LUTs and project files are not listed and are never deleted here." },
+  "studio.storage.detail": { zh: "这里只列可以重新生成的缓存和记录。工程、耗材档案、LUT、校准数据和设置不在列表里，清理不会动它们；10 分钟内刚写入的临时文件也会保留。", en: "Only rebuildable caches and records are listed. Projects, filament profiles, LUTs, calibration data and settings are not touched; temporary files written in the last 10 minutes are kept." },
   "studio.storage.loading": { zh: "正在统计…", en: "Measuring…" },
   "studio.storage.total": { zh: "共 {size}", en: "{size} in total" },
   "studio.storage.files": { zh: "{count} 个文件", en: "{count} files" },
   "studio.storage.clean_selected": { zh: "清理所选", en: "Clean selected" },
+  "studio.storage.job_running": { zh: "正在转换或生成，完成后再清理，免得删掉它正在用的文件。", en: "A conversion is running. Clean up after it finishes so its working files are not removed." },
   "studio.storage.cleaning": { zh: "正在清理…", en: "Cleaning…" },
   "studio.storage.refresh": { zh: "重新统计", en: "Refresh" },
   "studio.storage.cleaned": { zh: "已释放 {size}（{files} 个文件）。", en: "Freed {size} ({files} files)." },

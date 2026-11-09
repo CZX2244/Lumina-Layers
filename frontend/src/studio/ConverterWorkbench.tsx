@@ -33,6 +33,7 @@ import ReliefSettingsWidgetContent from "../components/widget/ReliefSettingsWidg
 import PuzzleSettingsWidgetContent from "../components/widget/PuzzleSettingsWidgetContent";
 import ModelSurfaceSettingsWidgetContent from "../components/widget/ModelSurfaceSettingsWidgetContent";
 import { PreflightPanel } from "./preflight/PreflightPanel";
+import { AssemblySheetButton } from "./assembly/AssemblySheetButton";
 import { OPEN_PRODUCT_EVENT, WORKBENCH_STEPS, scrollWorkbenchStep } from "./workbenchSteps";
 
 const Scene3D = lazy(() => import("../components/Scene3D"));
@@ -215,6 +216,7 @@ export function ConverterWorkbench({ suspended }: { suspended: boolean }) {
           <div className="p-3">
             <ActionBar />
           </div>
+          <AssemblySheetButton />
         </aside>
       </div>
 

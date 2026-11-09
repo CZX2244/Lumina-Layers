@@ -109,7 +109,7 @@ export function buildStudioCommands(context: CommandContext): StudioCommand[] {
   commands.push(
     { id: "project.open", group: "project", titleKey: "studio.cmd.project_open", keywords: "open lum 打开 工程", shortcut: "Ctrl+O", run: () => requestProjectCommand({ action: "open" }) },
     { id: "project.save", group: "project", titleKey: "studio.cmd.project_save", keywords: "save 保存", shortcut: "Ctrl+S", run: () => requestProjectCommand({ action: "save" }) },
-    { id: "project.saveAs", group: "project", titleKey: "studio.cmd.project_save_as", keywords: "save as 另存", shortcut: "Ctrl+Shift+S", run: () => requestProjectCommand({ action: "saveAs" }) },
+    { id: "project.saveAs", group: "project", titleKey: "studio.cmd.project_save_as", keywords: "save as 保存 另存 另存为", shortcut: "Ctrl+Shift+S", run: () => requestProjectCommand({ action: "saveAs" }) },
     { id: "project.new", group: "project", titleKey: "studio.cmd.project_new", keywords: "new 新建", shortcut: "Ctrl+N", run: () => requestProjectCommand({ action: "new" }) },
     { id: "project.center", group: "project", titleKey: "studio.cmd.project_center", keywords: "recent 最近 工程中心", run: () => requestProjectCommand({ action: "center" }) },
     { id: "project.export", group: "project", titleKey: "studio.cmd.project_export", keywords: "zip bundle 导出 打包", run: () => requestProjectCommand({ action: "export" }) },

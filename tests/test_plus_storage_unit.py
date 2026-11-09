@@ -20,6 +20,7 @@ def roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     for path in paths.values():
         path.mkdir()
     monkeypatch.setattr(config, "TEMP_DIR", str(paths["temp"]))
+    monkeypatch.setattr(plus_storage, "ACTIVE_FILE_GRACE_S", 60)
     monkeypatch.setattr(config, "MODELS_DIR", str(paths["models"]))
     monkeypatch.setitem(plus_storage._CATEGORIES, "solver_cache", plus_storage._CategorySpec(lambda: paths["solver_cache"]))
     monkeypatch.setitem(plus_storage._CATEGORIES, "feedback", plus_storage._CategorySpec(lambda: paths["feedback"]))
@@ -27,6 +28,9 @@ def roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     (paths["temp"] / "a.png").write_bytes(b"x" * 10)
     (paths["temp"] / "nested").mkdir()
     (paths["temp"] / "nested" / "b.bin").write_bytes(b"y" * 5)
+    import os as _os
+    for old_temp in (paths["temp"] / "a.png", paths["temp"] / "nested" / "b.bin"):
+        _os.utime(old_temp, (1_000_000, 1_000_000))
     (paths["solver_cache"] / "c.npz").write_bytes(b"z" * 7)
     old_log = paths["logs"] / "lumina_old.log"
     old_log.write_bytes(b"l" * 3)
@@ -71,3 +75,13 @@ def test_unknown_categories_are_rejected(roots: dict[str, Path]) -> None:
     client = TestClient(app)
     response = client.post("/api/system/storage/clean", json={"categories": ["materials"]}, headers=LOCAL)
     assert response.status_code == 422
+
+
+def test_clean_keeps_temp_files_a_running_job_may_use(roots: dict[str, Path]) -> None:
+    fresh = roots["temp"] / "in-flight.glb"
+    fresh.write_bytes(b"g" * 9)
+    client = TestClient(app)
+    response = client.post("/api/system/storage/clean", json={"categories": ["temp"]}, headers=LOCAL)
+    assert response.status_code == 200
+    assert fresh.exists(), "a file written moments ago is left for the running job"
+    assert not (roots["temp"] / "a.png").exists()

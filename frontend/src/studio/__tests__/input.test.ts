@@ -24,3 +24,34 @@ describe("studio input helpers", () => {
     expect(namePastedImage(new File(["x"], "a", { type: "image/jpeg" }), new Date(2026, 0, 1)).name.endsWith(".jpg")).toBe(true);
   });
 });
+
+import { renderHook } from "@testing-library/react";
+import { vi } from "vitest";
+import { useStudioInput } from "../useStudioInput";
+
+describe("studio keyboard shortcuts", () => {
+  it("opens the palette with Ctrl+K but not during IME composition", () => {
+    const openPalette = vi.fn();
+    const { unmount } = renderHook(() => useStudioInput({ openPalette, openShortcuts: vi.fn() }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, isComposing: true }));
+    expect(openPalette).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+    expect(openPalette).toHaveBeenCalledTimes(1);
+    unmount();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+    expect(openPalette).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the shortcuts sheet to text fields", () => {
+    const openShortcuts = vi.fn();
+    const { unmount } = renderHook(() => useStudioInput({ openPalette: vi.fn(), openShortcuts }));
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    expect(openShortcuts).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "?" }));
+    expect(openShortcuts).toHaveBeenCalledTimes(1);
+    input.remove();
+    unmount();
+  });
+});

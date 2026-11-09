@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildStudioCommands, filterCommands } from "../commands";
-import { allStudioNavItems, findNavItem, navOwnerOf, sectionTabsOf } from "../navigation";
+import { allStudioNavItems, findNavItem, localTabFor, navOwnerOf, sectionTabsOf } from "../navigation";
 import { translations } from "../../i18n/translations";
 
 const zh = (key: string) => translations[key]?.zh ?? key;
@@ -42,19 +42,38 @@ describe("studio navigation", () => {
     expect(sectionTabsOf("lut-compare")?.map((entry) => entry.tab)).toEqual(["lut-details", "lut-compare"]);
   });
 
-  it("reaches every classic page, including LUT merge", () => {
+  it("reaches every local page, including LUT merge", () => {
     const reachable = new Set<string>(allStudioNavItems().map((item) => item.tab));
     for (const tab of ["gradient-card-extract", "extractor", "lut-compare"]) reachable.add(tab);
     for (const tab of ["converter", "calibration", "extractor", "gradient-card-generate", "gradient-card-extract", "material-library",
-      "material-cloud-sync", "material-recipe", "lut-library", "lut-manager", "lut-cloud-sync", "lut-details", "lut-compare",
+      "material-recipe", "lut-library", "lut-manager", "lut-details", "lut-compare",
       "five-color", "vectorizer", "workshop", "settings"]) {
       expect(reachable.has(tab), tab).toBe(true);
       expect(findNavItem(tab as never), tab).not.toBeNull();
     }
   });
 
+  it("offers no cloud library pages and routes old links to the local library", () => {
+    const tabs = allStudioNavItems().map((item) => item.tab);
+    expect(tabs).not.toContain("material-cloud-sync");
+    expect(tabs).not.toContain("lut-cloud-sync");
+    expect(localTabFor("material-cloud-sync")).toBe("material-library");
+    expect(localTabFor("lut-cloud-sync")).toBe("lut-library");
+    expect(localTabFor("converter")).toBe("converter");
+  });
+
   it("uses distinct labels in the sidebar", () => {
     const labels = allStudioNavItems().map((item) => zh(item.labelKey));
     expect(new Set(labels).size).toBe(labels.length);
+  });
+});
+
+describe("cloud page redirect", () => {
+  it("moves any navigation into a cloud library to the local one", async () => {
+    const { useWidgetStore } = await import("../../stores/widgetStore");
+    useWidgetStore.getState().setActiveTab("lut-cloud-sync");
+    expect(useWidgetStore.getState().activeTab).toBe("lut-library");
+    useWidgetStore.getState().setActiveTab("material-cloud-sync");
+    expect(useWidgetStore.getState().activeTab).toBe("material-library");
   });
 });

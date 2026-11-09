@@ -12,6 +12,7 @@ removed by the existing full cleanup, which also resets sessions.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
@@ -34,10 +35,16 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 StorageCategory = Literal["temp", "models", "solver_cache", "feedback", "logs"]
 
 
+#: Files touched more recently than this may belong to a running preview or
+#: generation job, so selective cleanup leaves them alone.
+ACTIVE_FILE_GRACE_S = 10 * 60
+
+
 @dataclass(frozen=True)
 class _CategorySpec:
     root: Callable[[], Path]
     keep_newest_file: bool = False
+    protect_recent: bool = False
 
 
 def _log_root() -> Path:
@@ -46,8 +53,8 @@ def _log_root() -> Path:
 
 
 _CATEGORIES: dict[str, _CategorySpec] = {
-    "temp": _CategorySpec(lambda: Path(config.TEMP_DIR)),
-    "models": _CategorySpec(lambda: Path(config.MODELS_DIR)),
+    "temp": _CategorySpec(lambda: Path(config.TEMP_DIR), protect_recent=True),
+    "models": _CategorySpec(lambda: Path(config.MODELS_DIR), protect_recent=True),
     "solver_cache": _CategorySpec(lambda: default_cache_directory()),
     "feedback": _CategorySpec(_resolve_feedback_root),
     # The active log file is still being written; keep the newest one.
@@ -105,11 +112,16 @@ def _newest_file(root: Path) -> Path | None:
     return newest[1] if newest else None
 
 
-def _clean(root: Path, keep_newest_file: bool) -> tuple[int, int, int]:
-    """Delete everything below *root* (never *root* itself)."""
+def _clean(root: Path, keep_newest_file: bool, protect_recent: bool = False) -> tuple[int, int, int]:
+    """Delete everything below *root* (never *root* itself).
+
+    With *protect_recent*, files modified within :data:`ACTIVE_FILE_GRACE_S`
+    are kept so an in-flight job keeps its working files.
+    """
     if not root.is_dir():
         return 0, 0, 0
     keep = _newest_file(root) if keep_newest_file else None
+    cutoff = time.time() - ACTIVE_FILE_GRACE_S if protect_recent else None
     deleted = freed = failed = 0
     for directory, dirs, files in os.walk(root, topdown=False, onerror=lambda _error: None):
         for name in files:
@@ -117,7 +129,10 @@ def _clean(root: Path, keep_newest_file: bool) -> tuple[int, int, int]:
             if keep is not None and path == keep:
                 continue
             try:
-                size = path.lstat().st_size
+                stat = path.lstat()
+                if cutoff is not None and stat.st_mtime > cutoff:
+                    continue
+                size = stat.st_size
                 path.unlink()
                 deleted += 1
                 freed += size
@@ -162,7 +177,7 @@ def storage_clean(request: Request, body: StorageCleanRequest) -> StorageCleanRe
         resolved = root.resolve()
         if resolved == Path(resolved.anchor) or resolved == _REPO_ROOT.resolve():
             continue
-        d, f, x = _clean(root, spec.keep_newest_file)
+        d, f, x = _clean(root, spec.keep_newest_file, spec.protect_recent)
         deleted += d
         freed += f
         failed += x

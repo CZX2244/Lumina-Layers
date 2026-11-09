@@ -10,10 +10,6 @@
  */
 import type { BedSizeItem, FridgeMagnetItem } from "../../api/types";
 
-/** Mirrors api/schemas/converter.py FRIDGE_MAGNET_SHELL_THICKNESS_MM. */
-export const MAGNET_SHELL_MM = 0.4;
-/** Mirrors PrinterConfig.LAYER_HEIGHT used to round the auto-thickened backing. */
-export const BACKING_LAYER_MM = 0.08;
 /** Space we like to keep free on the plate for a wipe tower / brim. */
 export const PLATE_MARGIN_MM = 10;
 /** Thinnest keychain ring wall (each side) we consider sturdy. */
@@ -35,6 +31,9 @@ export interface PreflightInput {
   hasImage: boolean;
   widthMm: number;
   heightMm: number;
+  /** Backing the user chose. 用户设置的底板厚度。 */
+  baseBackingMm: number;
+  /** Backing that will be generated (after automatic magnet thickening). 实际生成的底板厚度。 */
   backingMm: number;
   backingInfillPercent: number;
   bed: BedSizeItem | null;
@@ -80,14 +79,6 @@ export function footprintMm(input: PreflightInput): { width: number; height: num
     }
   }
   return { width: round1(width), height: round1(height) };
-}
-
-/** Backing thickness the backend will use once magnets are embedded. */
-export function magnetBackingMm(magnets: FridgeMagnetItem[], backingMm: number): number {
-  if (!magnets.length) return backingMm;
-  const deepest = Math.max(...magnets.map((magnet) => magnet.thickness_mm));
-  const required = Math.ceil((deepest + MAGNET_SHELL_MM) / BACKING_LAYER_MM - 1e-9) * BACKING_LAYER_MM;
-  return Math.max(backingMm, Math.round(required * 100) / 100);
 }
 
 function magnetHalfExtent(magnet: FridgeMagnetItem): { x: number; y: number } {
@@ -146,9 +137,10 @@ export function runPreflight(input: PreflightInput): PreflightIssue[] {
     }
   }
   if (input.magnetsEnabled && input.magnets.length) {
-    const backing = magnetBackingMm(input.magnets, input.backingMm);
-    if (backing > input.backingMm + 1e-6) {
-      issues.push({ id: "magnet-backing", level: "info", messageKey: "studio.preflight.magnet_backing", params: { from: round1(input.backingMm), to: Math.round(backing * 100) / 100 } });
+    // The store resolves the thickened backing with the same rule as the
+    // generation validator (constants/fridgeMagnets.ts), so preview and 3MF agree.
+    if (input.backingMm > input.baseBackingMm + 1e-6) {
+      issues.push({ id: "magnet-backing", level: "info", messageKey: "studio.preflight.magnet_backing", params: { from: Math.round(input.baseBackingMm * 100) / 100, to: Math.round(input.backingMm * 100) / 100 } });
     }
     const halfW = input.widthMm / 2;
     const halfH = input.heightMm / 2;

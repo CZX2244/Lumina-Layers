@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "../../i18n/context";
 import { settingsGroupHeadingClass } from "../../components/ui/panelPrimitives";
+import { useConverterStore } from "../../stores/converter";
 import { cleanStorage, formatBytes, getStorageOverview, type StorageCategoryId, type StorageEntry } from "../storageApi";
 
 export function StorageSettings() {
@@ -13,6 +14,7 @@ export function StorageSettings() {
   const [selected, setSelected] = useState<Set<StorageCategoryId>>(new Set());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const jobRunning = useConverterStore((state) => state.isLoading || state.isGenerating || state.batchLoading);
 
   const refresh = useCallback(async () => {
     try {
@@ -73,10 +75,11 @@ export function StorageSettings() {
         </ul>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" disabled={!selected.size || busy} onClick={() => void clean()} className="action-control rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-40">
+        <button type="button" disabled={!selected.size || busy || jobRunning} onClick={() => void clean()} className="action-control rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-40">
           {busy ? t("studio.storage.cleaning") : t("studio.storage.clean_selected")}
         </button>
         <button type="button" disabled={busy} onClick={() => void refresh()} className="text-xs text-[var(--nav-tab-selected-bg)] hover:underline disabled:opacity-40">{t("studio.storage.refresh")}</button>
+        {jobRunning && <span className="text-xs text-[var(--surface-text-muted)]">{t("studio.storage.job_running")}</span>}
         {message && <span role="status" className="text-xs text-[var(--surface-text-muted)]">{message}</span>}
       </div>
     </div>

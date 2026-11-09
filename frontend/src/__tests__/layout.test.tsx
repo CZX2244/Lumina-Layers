@@ -172,13 +172,14 @@ describe("Widget Workspace Layout", () => {
     expect(screen.getByTestId("subtab-lut-library")).toBeInTheDocument();
     expect(screen.getByTestId("subtab-calibration")).toBeInTheDocument();
     expect(screen.getByTestId("subtab-extractor")).toBeInTheDocument();
-    expect(screen.getByTestId("subtab-lut-cloud-sync")).toBeInTheDocument();
+    // Lumina Studio Plus: no cloud registry, so the cloud library tabs are hidden.
+    expect(screen.queryByTestId("subtab-lut-cloud-sync")).not.toBeInTheDocument();
     expect(screen.queryByTestId("subtab-lut-manager")).not.toBeInTheDocument();
     expect(screen.getByTestId("subtab-five-color")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("tab-material-management"));
     expect(screen.getByTestId("subtab-material-library")).toBeInTheDocument();
-    expect(screen.getByTestId("subtab-material-cloud-sync")).toBeInTheDocument();
+    expect(screen.queryByTestId("subtab-material-cloud-sync")).not.toBeInTheDocument();
     expect(screen.queryByTestId("subtab-lut-cloud-sync")).not.toBeInTheDocument();
     expect(screen.getByTestId("subtab-material-recipe")).toBeInTheDocument();
 
