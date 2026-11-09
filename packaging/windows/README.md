@@ -7,8 +7,8 @@
 
 - **GitHub Actions（推荐）**：每次推送到 `plus/main`，工作流
   “Lumina Studio Plus (Windows desktop)” 会生成两个产物：
-  - `LuminaStudioPlus-installer`：安装程序（装到当前用户目录，无需管理员权限）
-  - `LuminaStudioPlus-portable`：免安装 zip，解压后运行 `Lumina Studio Plus.exe`
+  - `LuminaPlus-installer`：安装程序（装到当前用户目录，无需管理员权限）——推荐
+  - `LuminaPlus-portable`：免安装 zip，解压后运行 `Lumina Studio Plus.exe`
 - 推送形如 `plus-v2.0.1-1` 的标签时，同时发布到本仓库的 Releases 页。
 
 ## 在自己电脑上构建
@@ -33,7 +33,16 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
 - 更新需要手动检查：同一位置点“检查个人版更新”，会查询本仓库的 Releases；启动时不联网。
 - 旧版本如果在 `plus-config.json` 里存过 Registry 地址或令牌，启动时会自动删除。
 
+## 免安装版怎么解压
+
+1. 下载的 `LuminaPlus-portable.zip` 里还有一层 `LuminaPlus-<版本>.zip`，两层都要解压。
+2. 解压前先右键 zip → 属性 → 勾选“解除锁定” → 确定，避免解压出的文件被逐个拦截。
+3. 解压到短路径，例如 `C:\LuminaPlus\`。Windows 自带的解压会悄悄跳过总长超过 260 个字符的文件，
+   目录太深时程序会缺文件；启动时若检测到缺文件，会弹窗说明并给出日志位置。
+
 ## 常见问题
 
 - **首次打开被 SmartScreen 拦截**：安装包未签名，点“更多信息 → 仍要运行”。
 - **启动提示缺少 DLL**：安装微软 VC++ 2015-2022 x64 运行库后重试。
+- **打不开或启动失败**：弹窗会写明原因并可打开日志文件夹；日志在
+  `%APPDATA%\Lumina Studio Plus\logs\lumina-electron.log`，后端的错误输出也记录在里面。

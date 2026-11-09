@@ -36,7 +36,11 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $Work = Join-Path $PSScriptRoot "work"
 $Stage = Join-Path $PSScriptRoot "stage"
 $StageApp = Join-Path $Stage "app"
-$StagePython = Join-Path $Stage "python"
+# Short folder names: Windows Explorer skips files whose full path exceeds 260
+# characters when unpacking the portable ZIP. Packages go to py\sp, not
+# python\Lib\site-packages.
+$StagePython = Join-Path $Stage "py"
+$StagePackages = Join-Path $StagePython "sp"
 
 function Step($message) { Write-Host "`n==> $message" -ForegroundColor Cyan }
 function Invoke-Checked {
@@ -91,10 +95,14 @@ $env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
 $env:PYTHONDONTWRITEBYTECODE = "1"
 Invoke-Checked $Python @("-m", "ensurepip", "--upgrade")
 Invoke-Checked $Python @("-m", "pip", "install", "--no-warn-script-location", "--upgrade", "pip")
+New-Item -ItemType Directory -Force -Path $StagePackages | Out-Null
 Invoke-Checked $Python @("-m", "pip", "install", "--no-warn-script-location",
+  "--target", $StagePackages,
   "-r", (Join-Path $RepoRoot "requirements.txt"),
   "-c", (Join-Path $PSScriptRoot "constraints.txt"))
-& $Python -m pip freeze | Set-Content -Encoding utf8 (Join-Path $Stage "python-freeze.txt")
+# Make py\sp a site directory (so .pth files inside it are processed too).
+Set-Content -Encoding ascii (Join-Path $StagePython "Lib\site-packages\lumina-plus.pth") "import os, site, sys; site.addsitedir(os.path.join(sys.prefix, 'sp'))"
+& $Python -m pip freeze --path $StagePackages | Set-Content -Encoding utf8 (Join-Path $Stage "python-freeze.txt")
 
 # ── 3. Frontend + backend tree ────────────────────────────────────
 Step "Building the frontend"
@@ -120,9 +128,27 @@ foreach ($file in $CopyFiles) {
   $source = Join-Path $RepoRoot $file
   if (Test-Path $source) { Copy-Item -Force $source (Join-Path $StageApp $file) }
 }
-# Record the source revision and build time (used by the in-app update check).
+# Deepest bundled files (relative to resources\): the desktop host checks
+# them at start-up to detect an archive unpacked into a too-deep folder, and
+# the build fails if a typical unpack location would exceed MAX_PATH.
+$StageRootLength = (Resolve-Path $Stage).Path.Length + 1
+$Deepest = Get-ChildItem -Path $Stage -Recurse -File |
+  ForEach-Object { $_.FullName.Substring($StageRootLength) } |
+  Sort-Object Length -Descending | Select-Object -First 3
+$LongestRelative = $Deepest[0].Length
+# e.g. C:\Users\<20-char name>\Downloads\LuminaPlus-portable\LuminaPlus-2.0.1\resources\
+$TypicalPrefix = "C:\Users\abcdefghijklmnopqrst\Downloads\LuminaPlus-portable\LuminaPlus-2.0.1\resources\"
+Write-Host "Longest bundled path: $LongestRelative chars ($($Deepest[0]))"
+if ($TypicalPrefix.Length + $LongestRelative -gt 259) {
+  throw "Bundled path too long for MAX_PATH: $($TypicalPrefix.Length + $LongestRelative) chars ($($Deepest[0]))"
+}
+# Record the source revision, build time (update check) and sentinels (start-up check).
 $Revision = (git -C $RepoRoot rev-parse HEAD 2>$null)
-$BuildInfo = [ordered]@{ revision = if ($Revision) { $Revision.Trim() } else { "" }; builtAt = (Get-Date).ToUniversalTime().ToString("o") }
+$BuildInfo = [ordered]@{
+  revision = if ($Revision) { $Revision.Trim() } else { "" }
+  builtAt = (Get-Date).ToUniversalTime().ToString("o")
+  sentinels = @($Deepest | ForEach-Object { $_.Replace("\", "/") })
+}
 $BuildInfo | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $StageApp "BUILD_INFO.json")
 
 # ── 4. Self-tests with the bundled runtime ────────────────────────

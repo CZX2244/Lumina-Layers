@@ -99,6 +99,7 @@ async function fixture(t, platform, mode = "healthy", prepareUserData = () => {}
       app, BrowserWindow: Window, ipcMain, Menu: { setApplicationMenu(menu) { applicationMenu = menu; }, buildFromTemplate: template => template }, screen,
       dialog: {
         showErrorBox(...args) { errors.push(args); },
+        showMessageBoxSync(options) { errors.push([options.title, options.detail, options.buttons]); return 1; },
         showMessageBox(_window, options) { return new Promise(resolve => dialogs.push({ options, resolve })); },
       },
       protocol: { registerSchemesAsPrivileged() {}, handle() {} },
@@ -354,7 +355,9 @@ test("source desktop reports an exited backend and quits", async t => {
   f.children[0].exitCode = 1;
   f.children[0].emit("exit", 1);
   await until(() => f.app.quitted);
-  assert.equal(f.errors[0][0], "Backend Unavailable");
+  assert.equal(f.errors.length, 1);
+  assert.match(f.errors[0][1], /exited during start-up|后端启动后立即退出/);
+  assert.match(f.errors[0][1], /lumina-electron\.log/);
   assert.equal(f.mainWindow(), undefined);
 });
 
@@ -440,9 +443,41 @@ test("dist desktop keeps data locations the user already configured", async t =>
   assert.equal(backendEnv.LUMINA_OUTPUT_DIR, "D:\\Lumina\\out");
 });
 
+function packagedResources(t, buildInfo) {
+  const resourcesPath = fs.mkdtempSync(path.join(os.tmpdir(), "lumina-packaged-resources-"));
+  fs.mkdirSync(path.join(resourcesPath, "app"), { recursive: true });
+  fs.writeFileSync(path.join(resourcesPath, "app", "api_server.py"), "");
+  if (buildInfo) fs.writeFileSync(path.join(resourcesPath, "app", "BUILD_INFO.json"), "\uFEFF" + JSON.stringify(buildInfo));
+  t.after(() => fs.rmSync(resourcesPath, { recursive: true, force: true }));
+  return resourcesPath;
+}
+
+test("packaged desktop refuses to start when deep bundled files are missing", async t => {
+  const resourcesPath = packagedResources(t, { sentinels: ["py/sp/pkg/data/a-very-deep-profile.json"] });
+  const python = path.join(resourcesPath, "py", "python.exe");
+  const f = await fixture(t, "win32", "healthy", undefined, { isPackaged: true, resourcesPath, pythonPaths: [python] });
+  await until(() => f.app.quitted);
+  assert.equal(f.children.length, 0);
+  assert.equal(f.errors.length, 1);
+  assert.match(f.errors[0][1], /a-very-deep-profile\.json/);
+  assert.match(f.errors[0][1], /260/);
+  assert.match(String(f.errors[0][2]), /打开日志文件夹|Open log folder/);
+  assert.match(f.errors[0][1], /lumina-electron\.log/);
+});
+
+test("packaged desktop starts when every recorded bundled file exists", async t => {
+  const resourcesPath = packagedResources(t, { sentinels: ["py/sp/pkg/data/deep.json"] });
+  fs.mkdirSync(path.join(resourcesPath, "py", "sp", "pkg", "data"), { recursive: true });
+  fs.writeFileSync(path.join(resourcesPath, "py", "sp", "pkg", "data", "deep.json"), "{}");
+  const python = path.join(resourcesPath, "py", "python.exe");
+  const f = await fixture(t, "win32", "healthy", undefined, { isPackaged: true, resourcesPath, pythonPaths: [python] });
+  assert.equal(f.errors.length, 0);
+  assert.equal(f.children[0].command, python);
+});
+
 test("packaged desktop runs the bundled Python from the app resources", async t => {
-  const resourcesPath = path.join(os.tmpdir(), "lumina-packaged-resources");
-  const python = path.join(resourcesPath, "python", "python.exe");
+  const resourcesPath = packagedResources(t);
+  const python = path.join(resourcesPath, "py", "python.exe");
   const f = await fixture(t, "win32", "healthy", undefined, { isPackaged: true, resourcesPath, pythonPaths: [python] });
   assert.equal(f.children[0].command, python);
   assert.equal(f.children[0].args[0], path.join(resourcesPath, "app", "api_server.py"));

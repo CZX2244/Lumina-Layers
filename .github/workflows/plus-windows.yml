@@ -53,10 +53,18 @@ jobs:
       - name: Smoke test the portable build
         shell: pwsh
         run: |
-          $zip = Get-ChildItem dist-desktop -Filter "*-win-x64.zip" | Select-Object -First 1
+          $zip = Get-ChildItem dist-desktop -Filter "LuminaPlus-*.zip" | Select-Object -First 1
           if (-not $zip) { throw "Portable zip not found" }
-          $dir = Join-Path $env:RUNNER_TEMP "lumina-portable"
+          # Unpack as deep as a typical "Extract All" from Downloads:
+          # C:\Users\<20-char name>\Downloads\LuminaPlus-portable\LuminaPlus-2.0.1\ (77 chars).
+          $typical = "C:\Users\abcdefghijklmnopqrst\Downloads\LuminaPlus-portable\LuminaPlus-2.0.1\"
+          $pad = $typical.Length - ($env:RUNNER_TEMP.Length + 1) - 1
+          $dir = Join-Path $env:RUNNER_TEMP ("p" * $pad)
           Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force
+          # Windows Explorer skips files whose full path exceeds 259 characters.
+          $longest = Get-ChildItem $dir -Recurse -File | Sort-Object { $_.FullName.Length } -Descending | Select-Object -First 1
+          Write-Host "Unpacked to $dir ($($dir.Length + 1) chars); longest path $($longest.FullName.Length) chars: $($longest.FullName)"
+          if ($longest.FullName.Length -gt 259) { throw "Portable build exceeds MAX_PATH when unpacked from Downloads" }
           $exe = Get-ChildItem $dir -Recurse -Filter "Lumina Studio Plus.exe" | Select-Object -First 1
           if (-not $exe) { throw "Desktop executable not found in the zip" }
           $result = Join-Path $env:RUNNER_TEMP "smoke-test.json"
@@ -83,7 +91,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: LuminaStudioPlus-installer
+          name: LuminaPlus-installer
           path: dist-desktop/*.exe
           if-no-files-found: error
           compression-level: 0
@@ -91,8 +99,8 @@ jobs:
       - name: Upload portable zip
         uses: actions/upload-artifact@v4
         with:
-          name: LuminaStudioPlus-portable
-          path: dist-desktop/*-win-x64.zip
+          name: LuminaPlus-portable
+          path: dist-desktop/LuminaPlus-*.zip
           if-no-files-found: error
           compression-level: 0
 
@@ -104,7 +112,7 @@ jobs:
           prerelease: false
           files: |
             dist-desktop/*.exe
-            dist-desktop/*-win-x64.zip
+            dist-desktop/LuminaPlus-*.zip
           body: |
             Personal Windows build of Lumina-Layers (Lumina Studio), AGPL-3.0-only.
             Source: https://github.com/${{ github.repository }}/tree/${{ github.sha }}

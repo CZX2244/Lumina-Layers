@@ -24,8 +24,8 @@ files:
 extraResources:
   - from: ../packaging/windows/stage/app
     to: app
-  - from: ../packaging/windows/stage/python
-    to: python
+  - from: ../packaging/windows/stage/py
+    to: py
   # The official launcher protocol reads this marker from Resources/.
   - from: project-capabilities.v1.json
     to: project-capabilities.v1.json
@@ -36,7 +36,8 @@ win:
       arch: [x64]
     - target: zip
       arch: [x64]
-  artifactName: "LuminaStudioPlus-${version}-win-x64.${ext}"
+  # Short names: the portable ZIP is often unpacked into a folder of the same name.
+  artifactName: "LuminaPlus-${version}.${ext}"
   # Unsigned personal build.
   signAndEditExecutable: true
 nsis:

@@ -26,7 +26,8 @@ function resolveRuntimeLayout({ isPackaged, resourcesPath, electronDir, env = {}
   const packagedRoot = isPackaged && resourcesPath ? path.join(resourcesPath, "app") : null;
   const rootDir = packagedRoot || path.join(electronDir, "..");
   const isWin = platform === "win32";
-  const bundledPythonDir = isPackaged && resourcesPath ? path.join(resourcesPath, "python") : null;
+  // Short folder names keep deep package paths under Windows' 260-character limit.
+  const bundledPythonDir = isPackaged && resourcesPath ? path.join(resourcesPath, "py") : null;
   const bundledPython = bundledPythonDir
     ? (isWin ? path.join(bundledPythonDir, "python.exe") : path.join(bundledPythonDir, "bin", "python3"))
     : null;
@@ -68,4 +69,26 @@ function distDataEnv({ userData, env = {} }) {
   return result;
 }
 
-module.exports = { isDistMode, resolveRuntimeLayout, distDataEnv };
+/**
+ * Files a packaged build cannot start without. `buildInfo.sentinels` lists
+ * the deepest bundled files (relative to resources/) recorded at build time:
+ * Windows' built-in ZIP extraction silently skips files whose full path is
+ * longer than 260 characters, so a missing sentinel means the archive was
+ * unpacked into a folder that is too deep (or incompletely).
+ * 打包版启动必需的文件；sentinels 为构建时记录的最深文件，缺失通常表示解压路径过长或解压不完整。
+ */
+function missingBundleFiles({ resourcesPath, layout, buildInfo, existsSync }) {
+  const missing = [];
+  if (layout.bundledPython && !existsSync(layout.bundledPython)) missing.push(layout.bundledPython);
+  const apiServer = path.join(layout.rootDir, "api_server.py");
+  if (!existsSync(apiServer)) missing.push(apiServer);
+  const sentinels = Array.isArray(buildInfo?.sentinels) ? buildInfo.sentinels : [];
+  for (const relative of sentinels) {
+    if (typeof relative !== "string" || !relative || relative.includes("..")) continue;
+    const full = path.join(resourcesPath, ...relative.split("/"));
+    if (!existsSync(full)) missing.push(full);
+  }
+  return missing;
+}
+
+module.exports = { isDistMode, resolveRuntimeLayout, distDataEnv, missingBundleFiles };

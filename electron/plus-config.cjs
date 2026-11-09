@@ -79,7 +79,9 @@ function isNewerRelease(release, buildInfo) {
 
 function readBuildInfo(appRoot, fileSystem = fs) {
   try {
-    const info = JSON.parse(fileSystem.readFileSync(path.join(appRoot, "BUILD_INFO.json"), "utf8"));
+    // Windows PowerShell 5.1 writes UTF-8 with a BOM.
+    const text = fileSystem.readFileSync(path.join(appRoot, "BUILD_INFO.json"), "utf8").replace(/^\uFEFF/, "");
+    const info = JSON.parse(text);
     return info && typeof info === "object" ? info : null;
   } catch {
     return null;

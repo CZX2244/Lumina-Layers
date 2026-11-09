@@ -101,7 +101,7 @@ const WORKSHOP_RUNTIME_HEADER_NAMES = [
   "x-content-type-options",
 ];
 
-const { resolveRuntimeLayout, distDataEnv } = require("./runtime-layout.cjs");
+const { resolveRuntimeLayout, distDataEnv, missingBundleFiles } = require("./runtime-layout.cjs");
 const RUNTIME_LAYOUT = resolveRuntimeLayout({
   isPackaged: app.isPackaged,
   resourcesPath: process.resourcesPath,
@@ -488,6 +488,51 @@ async function runSmokeTest(mainWindow) {
   logSys(`Smoke test ${result.ok ? "passed" : "failed"}: ${JSON.stringify(result)}`);
   isQuitting = true;
   app.quit();
+}
+
+/**
+ * Explain a start-up failure: what happened, where the log is and what to try.
+ * In the packaged build the dialog offers to open the log folder; the CI smoke
+ * test writes the reason to its result file instead of blocking on a dialog.
+ * 启动失败说明：发生了什么、日志在哪、下一步怎么做；打包版可直接打开日志文件夹。
+ */
+function reportStartupFailure(code, { zh, en, archiveHint = false }) {
+  closeSplash();
+  const logDir = app.getPath("logs");
+  const logFile = path.join(logDir, "lumina-electron.log");
+  logErr(`Startup failed (${code}): ${en}`);
+  if (SMOKE_TEST) {
+    try {
+      const resultPath = process.env.LUMINA_SMOKE_TEST_RESULT || path.join(app.getPath("userData"), "smoke-test.json");
+      fs.mkdirSync(path.dirname(resultPath), { recursive: true });
+      fs.writeFileSync(resultPath, JSON.stringify({ ok: false, reason: code, detail: en }, null, 2));
+    } catch (error) {
+      logErr(`Smoke test result could not be written: ${error.message}`);
+    }
+    return;
+  }
+  const zhHint = archiveHint
+    ? "\n\n如果是免安装版：请先右键 ZIP → 属性 → 勾选“解除锁定”，再解压到短路径（例如 C:\\LuminaPlus\\），或改用安装版。"
+    : "";
+  const enHint = archiveHint
+    ? "\n\nPortable build: right-click the ZIP → Properties → Unblock, then extract it to a short folder such as C:\\LuminaPlus\\, or use the installer."
+    : "";
+  const message = currentLang === "zh"
+    ? `${zh}${zhHint}\n\n日志文件：${logFile}`
+    : `${en}${enHint}\n\nLog file: ${logFile}`;
+  const title = currentLang === "zh" ? "Lumina Studio 无法启动" : "Lumina Studio could not start";
+  if (DIST_MODE && typeof dialog.showMessageBoxSync === "function") {
+    const response = dialog.showMessageBoxSync({
+      type: "error", title, message: title, detail: message, noLink: true,
+      buttons: currentLang === "zh" ? ["打开日志文件夹", "退出"] : ["Open log folder", "Quit"],
+      defaultId: 0, cancelId: 1,
+    });
+    if (response === 0 && typeof shell.openPath === "function") {
+      void shell.openPath(logDir).catch(() => {});
+    }
+    return;
+  }
+  dialog.showErrorBox(title, message);
 }
 
 /** Page origin the main window loads: Vite in dev, the backend in dist mode. */
@@ -1229,12 +1274,32 @@ app.whenReady().then(async () => {
     enableManagedDesktopHost(backendEndpoint.port);
     if (!DIST_MODE) await assertPortsAvailable([FRONTEND_PORT]);
   } catch (error) {
-    closeSplash();
-    dialog.showErrorBox("Lumina Studio", currentLang === "zh"
-      ? "没有可用的本地启动端口。请关闭多余的本地服务后重试；启动器不会终止其它进程。"
-      : "No local startup port is available. Close unused local services and retry. Other processes will not be terminated.");
+    reportStartupFailure("startup_port_unavailable", {
+      zh: "没有可用的本地启动端口。请关闭多余的本地服务后重试；启动器不会终止其它进程。",
+      en: "No local startup port is available. Close unused local services and retry. Other processes will not be terminated.",
+    });
     app.quit();
     return;
+  }
+
+  // ── Check the packaged files before starting the backend ──
+  if (app.isPackaged && process.resourcesPath) {
+    const missing = missingBundleFiles({
+      resourcesPath: process.resourcesPath,
+      layout: RUNTIME_LAYOUT,
+      buildInfo: readBuildInfo(ROOT_DIR),
+      existsSync: fs.existsSync,
+    });
+    if (missing.length) {
+      for (const file of missing) logErr(`Missing bundled file: ${file}`);
+      reportStartupFailure("startup_bundle_incomplete", {
+        zh: `程序文件不完整，缺少 ${missing.length} 个文件（第一个：${missing[0]}）。\n通常是解压路径过长（Windows 会跳过超过 260 个字符的路径）或解压被中断。`,
+        en: `The program files are incomplete: ${missing.length} missing (first: ${missing[0]}).\nUsually the archive was extracted into a folder that is too deep (Windows skips paths over 260 characters) or extraction was interrupted.`,
+        archiveHint: true,
+      });
+      app.quit();
+      return;
+    }
   }
 
   // ── Start backend ──
@@ -1252,10 +1317,11 @@ app.whenReady().then(async () => {
       backendRuntimeEnv(),
     );
   } catch (err) {
-    dialog.showErrorBox(
-      "Backend Start Failed",
-      `Failed to start backend: ${err.message}`,
-    );
+    reportStartupFailure("startup_backend_spawn_failed", {
+      zh: `无法运行内置后端（${python}）：${err.message}`,
+      en: `The bundled backend could not run (${python}): ${err.message}`,
+      archiveHint: DIST_MODE,
+    });
     app.quit();
     return;
   }
@@ -1274,10 +1340,18 @@ app.whenReady().then(async () => {
     const failureCode = ["startup_backend_timeout", "startup_backend_exited"].includes(err.message)
       ? err.message : "startup_failed";
     logErr(`Backend health check failed: ${err.message}`);
-    dialog.showErrorBox("Backend Unavailable",
-      failureCode === "startup_backend_timeout"
-        ? `Backend did not respond within ${HEALTH_TIMEOUT_MS / 1000}s. Please check logs.`
-        : `Backend startup failed: ${failureCode}. Please check logs.`);
+    const seconds = HEALTH_TIMEOUT_MS / 1000;
+    reportStartupFailure(failureCode, failureCode === "startup_backend_timeout"
+      ? {
+        zh: `后端在 ${seconds} 秒内没有响应。可能是首次启动较慢或被安全软件拦截；请重试，仍失败时查看日志末尾的错误。`,
+        en: `The backend did not respond within ${seconds} s. The first start can be slow, or security software may block it. Retry; if it still fails, check the end of the log.`,
+        archiveHint: DIST_MODE,
+      }
+      : {
+        zh: `后端启动后立即退出（${failureCode}）。日志末尾记录了后端的错误输出。`,
+        en: `The backend exited during start-up (${failureCode}). The end of the log contains its error output.`,
+        archiveHint: DIST_MODE,
+      });
     app.quit();
     return;
   }
@@ -1292,10 +1366,10 @@ app.whenReady().then(async () => {
   createWindow();
 }).catch(error => {
   logErr(`Desktop startup failed: ${error.code || error.message}`);
-  closeSplash();
-  dialog.showErrorBox("Lumina Studio", currentLang === "zh"
-    ? "软件未能完成启动。请打开此版本日志查看详情，再联系支持。"
-    : "Startup could not finish. Open this version's logs for details and contact support.");
+  reportStartupFailure("startup_failed", {
+    zh: `软件未能完成启动：${error.message}`,
+    en: `Startup could not finish: ${error.message}`,
+  });
   app.quit();
 });
 
