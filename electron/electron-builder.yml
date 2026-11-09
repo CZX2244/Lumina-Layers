@@ -36,11 +36,16 @@ win:
       arch: [x64]
     - target: zip
       arch: [x64]
+  # Next to the exe: repairs folder permissions when a portable copy will not start.
+  extraFiles:
+    - from: fix-permissions.cmd
+      to: fix-permissions.cmd
   # Short names: the portable ZIP is often unpacked into a folder of the same name.
   artifactName: "LuminaPlus-${version}.${ext}"
   # Unsigned personal build.
   signAndEditExecutable: true
 nsis:
+  include: installer.nsh
   oneClick: false
   perMachine: false
   allowElevation: false

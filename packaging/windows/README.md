@@ -44,5 +44,13 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
 
 - **首次打开被 SmartScreen 拦截**：安装包未签名，点“更多信息 → 仍要运行”。
 - **启动提示缺少 DLL**：安装微软 VC++ 2015-2022 x64 运行库后重试。
+- **双击没有任何反应（没有窗口、没有提示）**：多半是程序所在文件夹的权限被其它软件改过
+  （例如 Codex 的 Windows 沙箱会给整个用户目录加 AppContainer 权限项），Electron 的沙箱读不到
+  程序文件，启动即退出（Windows 事件里异常码 `0x80000003`）。
+  - 安装版：安装程序会自动给安装目录补上“所有应用程序包”读取权限。
+  - 免安装版：程序首次启动时会尝试自动补；仍打不开就双击程序旁的 `fix-permissions.cmd`，
+    或在 PowerShell 执行（把路径换成你的文件夹）：
+    `icacls "C:\LuminaPlus" /grant *S-1-15-2-1:(OI)(CI)(RX)`
+  - 这只增加读取/执行权限，不修改程序文件，也不动其它软件加的权限项。
 - **打不开或启动失败**：弹窗会写明原因并可打开日志文件夹；日志在
   `%APPDATA%\Lumina Studio Plus\logs\lumina-electron.log`，后端的错误输出也记录在里面。

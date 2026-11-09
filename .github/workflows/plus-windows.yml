@@ -77,6 +77,47 @@ jobs:
           Get-Content $result
           if (-not $data.ok) { throw "Smoke test failed: $($data.reason)" }
 
+      - name: Check start-up with an AppContainer-only folder ACL
+        shell: pwsh
+        run: |
+          # Electron >= 44.5 aborts (install_dir_access.cc) when the install
+          # folder ACL has an AppContainer package SID but no ALL APPLICATION
+          # PACKAGES entry - seen on user profiles changed by sandboxing tools.
+          $zip = Get-ChildItem dist-desktop -Filter "LuminaPlus-*.zip" | Select-Object -First 1
+          $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+          $straySid = "S-1-15-2-3069148591-2086031501-328364604-927767207-2443302272-2895009542-3144734569"
+          function New-RestrictedCopy([string]$name) {
+            $dir = Join-Path $env:RUNNER_TEMP $name
+            Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force
+            icacls $dir /inheritance:r /grant:r "*${me}:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" "*${straySid}:(OI)(CI)(RX)" /Q | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "icacls failed for $dir" }
+            return $dir
+          }
+          function Invoke-Smoke([string]$dir, [bool]$skipRepair) {
+            $result = Join-Path $env:RUNNER_TEMP "acl-smoke.json"
+            Remove-Item $result -ErrorAction SilentlyContinue
+            $env:LUMINA_SMOKE_TEST = "1"
+            $env:LUMINA_SMOKE_TEST_RESULT = $result
+            $env:LUMINA_SKIP_INSTALL_ACL = if ($skipRepair) { "1" } else { "" }
+            $proc = Start-Process -FilePath (Join-Path $dir "Lumina Studio Plus.exe") -PassThru
+            if (-not $proc.WaitForExit(300000)) { Stop-Process -Id $proc.Id -Force; return "timeout" }
+            if (Test-Path $result) { $data = Get-Content $result -Raw | ConvertFrom-Json; if ($data.ok) { return "ok" } else { return "failed:$($data.reason)" } }
+            return ("crashed:0x{0:X8}" -f $proc.ExitCode)
+          }
+          $report = [ordered]@{}
+          # 1. Reproduce: no repair at all.
+          $repro = New-RestrictedCopy "acl-repro"
+          $report.unrepaired = Invoke-Smoke $repro $true
+          # 2. Start-up self-repair in main.cjs (best effort; timing relative to Electron's check is unverified).
+          $report.selfRepairFirstStart = Invoke-Smoke $repro $false
+          if ($report.selfRepairFirstStart -ne "ok") { $report.selfRepairSecondStart = Invoke-Smoke $repro $false }
+          # 3. fix-permissions.cmd next to the exe (must work).
+          $fixed = New-RestrictedCopy "acl-fixed"
+          cmd /c "`"$(Join-Path $fixed 'fix-permissions.cmd')`" < NUL"
+          $report.afterFixScript = Invoke-Smoke $fixed $true
+          $report | ConvertTo-Json | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP "acl-report.json")
+          if ($report.afterFixScript -ne "ok") { throw "fix-permissions.cmd did not make the restricted copy start" }
+
       - name: Upload smoke-test logs on failure
         if: failure()
         uses: actions/upload-artifact@v4

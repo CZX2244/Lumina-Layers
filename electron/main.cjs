@@ -11,11 +11,36 @@ const {
   shell,
   webFrameMain,
 } = require("electron");
-const { spawn, execSync } = require("child_process");
+const childProcess = require("child_process");
+const { spawn, execSync } = childProcess;
 const http = require("http");
 const nodeNet = require("net");
 const fs = require("fs");
 const path = require("path");
+// Before anything else: let the sandbox read a portable copy's folder (see install-acl.cjs).
+const { ensureInstallDirReadable } = require("./install-acl.cjs");
+const INSTALL_ACL_MESSAGES = [];
+const INSTALL_ACL_RESULT = (() => {
+  try {
+    return ensureInstallDirReadable({
+      platform: process.platform,
+      isPackaged: app.isPackaged,
+      execPath: process.execPath,
+      userData: app.getPath("userData"),
+      // CI sets this to reproduce the unrepaired crash.
+      disabled: process.env.LUMINA_SKIP_INSTALL_ACL === "1",
+      systemRoot: process.env.SystemRoot,
+      fileSystem: fs,
+      execFileSync: typeof childProcess.execFileSync === "function"
+        ? childProcess.execFileSync
+        : () => { throw new Error("execFileSync unavailable"); },
+      log: message => INSTALL_ACL_MESSAGES.push(message),
+    });
+  } catch (error) {
+    INSTALL_ACL_MESSAGES.push(`Install folder permission check failed: ${error.message}`);
+    return "failed";
+  }
+})();
 const { createLauncherStartup } = require('./launcher-startup.cjs');
 const { createSplashController } = require('./splash-controller.cjs');
 const launcherStartup = createLauncherStartup();
@@ -1231,6 +1256,8 @@ app.on("window-all-closed", () => {
 app.whenReady().then(async () => {
   if (!gotLock) return;
   initLog();
+  logSys(`Install folder permission check: ${INSTALL_ACL_RESULT}`);
+  for (const message of INSTALL_ACL_MESSAGES) logSys(message);
   logSys("Lumina Studio Electron starting...");
   if (scrubLegacyPlusConfig(app.getPath("userData"))) logSys("Removed legacy registry settings from plus-config.json");
   // 让 about 面板 / app.getName() / 部分 macOS 系统提示显示正确的名字。
