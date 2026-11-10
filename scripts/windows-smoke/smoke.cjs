@@ -88,13 +88,13 @@ async function boot() {
   if(process.env.SMOKE_EVIDENCE==='1')await context.tracing.start({screenshots:true,snapshots:true});
   if(browser){page=await context.newPage();await page.goto(process.env.SMOKE_URL,{waitUntil:'domcontentloaded'});}
   else {page=await until(async()=>{for(const p of app.windows()) if(/^http:\/\/127\.0\.0\.1/.test(p.url())) return p;return null;},240000);}
+  page.on('pageerror',e=>report.pageErrors.push({url:page.url(),error:e.stack||String(e)}));
   page.setDefaultTimeout(20000);
   await page.getByTestId('studio-shell').waitFor({timeout:120000});
   const announcement=page.getByRole('button',{name:'知道了',exact:true});
   if(await announcement.isVisible())await announcement.click();
   else {await pause(750);if(await announcement.isVisible())await announcement.click();}
-  await page.getByTestId('studio-nav-converter').click();
-  await page.getByTestId('studio-workbench').waitFor();
+
 }
 async function size(w,h) {
   await page.getByRole('textbox',{name:'宽度 value',exact:true}).fill(String(w));
@@ -152,95 +152,42 @@ async function newProject(){
 }
 async function clearModal(){await page.keyboard.press('Escape');const close=page.getByRole('dialog').getByRole('button',{name:'关闭',exact:true});if(await close.count()===1&&await close.isVisible())await close.click();}
 
+async function viewportState(){
+ return page.evaluate(()=>{
+  const frames=[...document.querySelectorAll('canvas')].filter(c=>{const r=c.getBoundingClientRect();return r.width>100&&r.height>100&&getComputedStyle(c).visibility!=='hidden';}).map(c=>{
+   const gl=c.getContext('webgl2')||c.getContext('webgl');let white=0,samples=0;
+   if(gl&&!gl.isContextLost())for(let y=1;y<=3;y++)for(let x=1;x<=3;x++){const rgba=new Uint8Array(4);gl.readPixels(Math.floor(c.width*x/4),Math.floor(c.height*y/4),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);samples++;if(rgba[0]>248&&rgba[1]>248&&rgba[2]>248&&rgba[3]>248)white++;}
+   return {width:c.width,height:c.height,lost:gl?.isContextLost()??null,white,samples};
+  });
+  return {bodyChars:document.body.innerText.length,shell:!!document.querySelector('[data-testid=studio-shell]'),workbench:!!document.querySelector('[data-testid=studio-workbench]'),frames};
+ });
+}
 (async()=>{
  try{
-  await boot();
-  await check('01-owned-backend-and-shell',async()=>{const r=await page.request.get(new URL('/api/health',page.url()).href);const body=await r.json();assert.equal(r.status(),200);assert.equal(body.status,'ok');assert.equal(body.worker_pool.healthy,true);return {url:page.url(),...body};});
-  await check('02-page-navigation-and-command-palette',async()=>{
-    for(const id of ['vectorizer','workshop','material-library','gradient-card-generate','material-recipe','lut-library','calibration','lut-details','five-color','lut-manager','settings']){await page.getByTestId('studio-nav-'+id).click();assert((await page.locator('main').innerText()).trim().length>0);}
-    await page.getByTestId('studio-palette-button').click();await page.getByTestId('studio-command-palette').waitFor();await page.keyboard.press('Escape');
-    await page.getByTestId('studio-nav-converter').click();return {pages:11};
+  await boot();report.entry=process.env.SMOKE_ENTRY||'template';
+  await check('01-cold-first-magnet-entry',async()=>{
+   const started=Date.now();
+   if(report.entry==='template'){await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-fridge-magnet').click();}
+   else {await page.getByTestId('studio-nav-converter').click();await page.getByTestId('studio-product-fridge-magnet').getByRole('button').first().click();await setSwitch('启用冰箱贴磁铁槽',true);}
+   const samples=[];for(let i=0;i<12;i++){samples.push({ms:Date.now()-started,...await viewportState()});await pause(250);}
+   await pause(2000);let settled=await viewportState();report.observations={coldSamples:samples,coldSettled:settled};
+   assert(settled.shell&&settled.workbench&&settled.bodyChars>300,'Cold entry left the application blank');
+   await page.locator('canvas').first().waitFor({timeout:60000});settled=await viewportState();assert(settled.frames.length>0,'No visible preview canvas after cold entry');assert.equal(report.pageErrors.length,0,'Cold entry emitted a renderer JavaScript error');
+   assert(!settled.frames.some(f=>f.lost||f.samples>0&&f.white===f.samples),'Cold preview remained white or lost its WebGL context');return settled;
   });
-  await check('03-raster-import-preview-and-3mf',async()=>{
-    await setSwitch('上传后裁剪',false);await chooseLut();await importImage(png);await size(40);
-    const p=await preview();const output=await generate();return {dimensions:await dimensions(),session:p.session_id,output};
+  await check('02-switch-away-and-return',async()=>{
+   await page.getByTestId('studio-nav-settings').click();await pause(500);await page.getByTestId('studio-nav-converter').click();await pause(3000);
+   const state=await viewportState();report.observations.returned=state;assert(state.workbench&&state.bodyChars>300,'Return left application blank');assert.equal(report.pageErrors.length,0,'Renderer JavaScript error');return state;
   });
-  if(process.env.SMOKE_DRY_LIMIT)return;
-  await check('06-native-svg-preview-and-3mf',async()=>{await newProject();await setSwitch('上传后裁剪',false);await chooseLut();await importImage(svg);await size(40);const p=await preview();return {session:p.session_id,output:await generate()};});
-  await check('07-magnet-preview-and-3mf',async()=>{
-    await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-fridge-magnet').click();await size(40);
-    const p=await preview();return {session:p.session_id,output:await generate()};
+  await check('03-first-magnet-model-preview',async()=>{
+   await setSwitch('上传后裁剪',false);await chooseLut();await importImage(png);await size(40);await preview();await pause(3000);
+   const state=await viewportState();report.observations.model=state;assert(state.workbench&&state.bodyChars>300,'Model preview left application blank');assert.equal(report.pageErrors.length,0,'Magnet preview emitted a renderer JavaScript error');return state;
   });
-  await check('08-large-format-assembly-png',async()=>{
-    await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-large-format').click();await size(80);
-    await page.getByRole('textbox',{name:'切片宽度 value',exact:true}).fill('50');await page.getByRole('textbox',{name:'切片宽度 value',exact:true}).press('Enter');
-    await page.getByRole('textbox',{name:'切片高度 value',exact:true}).fill('50');await page.getByRole('textbox',{name:'切片高度 value',exact:true}).press('Enter');
-    await preview();const before=(await savedFiles()).length;await page.getByTestId('studio-assembly').getByRole('button').click();
-    if(!app)return {skipped:'native save checked on Windows'};
-    const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;});await until(()=>fs.existsSync(file));assert.equal(fs.readFileSync(file).subarray(1,4).toString(),'PNG');return {file,bytes:fs.statSync(file).size};
-  });
-  await check('08b-puzzle-assembly-png',async()=>{
-    await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-puzzle').click();await size(80);
-    const fields=page.getByTestId('studio-product-puzzle').locator('input[type=number]');for(const i of [0,1]){await fields.nth(i).fill('2');await fields.nth(i).press('Tab');}
-    await preview();const button=page.getByTestId('studio-assembly').getByRole('button');await until(()=>button.isEnabled(),60000);
-    const before=(await savedFiles()).length;const started=Date.now();await button.click();if(!app)return {skipped:'native save checked on Windows'};
-    const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;});
-    await until(()=>fs.existsSync(file)&&fs.statSync(file).mtimeMs>=started-100);assert.equal(fs.readFileSync(file).subarray(1,4).toString(),'PNG');return {file,bytes:fs.statSync(file).size};
-  });
-  await check('09-home-empty-slicer-detection-bounded',async()=>{
-    let requests=0;const count=r=>{if(new URL(r.url()).pathname==='/api/slicer/detect')requests++;};page.on('request',count);
-    await page.getByTestId('studio-nav-home').click();await pause(3000);page.off('request',count);assert(requests<=5,`${requests} slicer detection requests in 3 seconds`);return {requests,observationMs:3000};
-  });
-  await check('10-template-large-format-keeps-400mm',async()=>{
-    await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-large-format').click();const d=await dimensions();assert.equal(Math.max(d.width,d.height),400);return d;
-  });
-  await check('11-template-resets-outline',async()=>{
-    await page.getByTestId('studio-product-outline').getByRole('button').first().click();await setSwitch('启用外轮廓',true);
-    await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-framed').click();
-    const card=page.getByTestId('studio-product-outline');const text=await card.innerText();assert(!text.includes('已开启'),text);return {outlineCard:text};
-  });
-  await check('12-puzzle-template-persists-through-image-import',async()=>{
-    await newProject();await setSwitch('上传后裁剪',false);await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-puzzle').click();
-    await importImage(png);const on=await page.getByRole('switch',{name:'启用拼图模式',exact:true}).isChecked();assert.equal(on,true,'Import switched puzzleEnabled off');return {enabled:on};
-  });
-  await check('13-keychain-template-size-before-image-import',async()=>{
-    await newProject();await setSwitch('上传后裁剪',false);await size(150,150);await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-keychain').click();await importImage(png);await pause(300);const d=await dimensions();assert.equal(Math.max(d.width,d.height),50);return d;
-  });
-  await check('14-selective-cleanup-keeps-unexpired-download',async()=>{
-    if(!app)return {skipped:'requires packaged runtime fixture paths'};
-    await newProject();await setSwitch('上传后裁剪',false);await chooseLut();await importImage(png);await size(40);await preview();await generate();
-    const url=lastArtifact?.download_url;assert(url,'Missing download URL');const before=await page.request.get(new URL(url,page.url()).href);assert.equal(before.status(),200);
-    const files=[];const walk=dir=>{if(!fs.existsSync(dir))return;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const f=path.join(dir,e.name);if(e.isDirectory())walk(f);else if(/\.3mf$/i.test(e.name))files.push(f);}};walk(path.join(runtime,'output'));
-    assert(files.length>0,'No generated runtime 3MF to age');const old=(Date.now()-11*60000)/1000;for(const f of files)fs.utimesSync(f,old,old);
-    await page.getByTestId('studio-nav-settings').click();const storage=page.getByTestId('studio-storage');
-    await storage.getByRole('button',{name:'重新统计',exact:true}).click();const temp=storage.locator('li').filter({hasText:'临时文件'}).getByRole('checkbox');await temp.check();await storage.locator('li').filter({hasText:'预览模型'}).getByRole('checkbox').check();
-    await storage.getByRole('button',{name:'清理所选',exact:true}).click();await storage.getByRole('status').waitFor();
-    const after=await page.request.get(new URL(url,page.url()).href);assert.equal(after.status(),200,'Selective cleanup invalidated a live 1-hour download');return {url,before:before.status(),after:after.status(),agedFiles:files.length};
-  });
-  await check('04-project-save-and-reopen',async()=>{
-    if(!app)return {skipped:'local browser harness verification only'};
-    await newProject();await setSwitch('上传后裁剪',false);await chooseLut();await importImage(png);await size(40);await preview();await generate();
-    const before=(await savedFiles()).length;await page.getByTestId('project-bar').getByRole('button',{name:'保存',exact:true}).click();
-    const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;});
-    await until(()=>fs.existsSync(file)&&fs.statSync(file).size>0);const info=inspectZip(file);assert(file.endsWith('.lum'));
-    await newProject();await app.evaluate((_e,p)=>{global.__smokeOpen=p;},file);
-    await page.getByTestId('project-bar').getByRole('button',{name:'打开',exact:true}).click();
-    const discard=page.getByRole('button',{name:'放弃修改',exact:true});if(await discard.isVisible())await discard.click();
-    await until(async()=>Math.abs((await dimensions()).width-40)<0.1,60000);await preview();report.projectReopened=true;return info;
-  });
-  await check('05-download-survives-source-session-close',async()=>{
-    const body=lastArtifact;const url=body?.download_url;assert(url,'No successful generation response download_url');
-    const before=await page.request.get(new URL(url,page.url()).href);assert.equal(before.status(),200);
-    await newProject();const after=await page.request.get(new URL(url,page.url()).href);assert.equal(after.status(),200);return {url,before:before.status(),after:after.status()};
-  });
-  await check('16-builtin-LUT-reselection-after-project-reopen',async()=>{await newProject();await chooseLut();return {fixtureSelected:true,neededRefresh:Boolean(report.lutCatalogMismatch)};});
- }catch(error){report.fatal=error.stack;console.error(error);}
+ }catch(error){report.fatal=error.stack;console.error(error.message);}
  finally{
   report.finishedAt=new Date().toISOString();report.summary={passed:report.cases.filter(x=>x.status==='passed').length,failed:report.cases.filter(x=>x.status==='failed').length};writeReport();process.exitCode=report.fatal||report.summary.failed?1:0;
-  if(process.env.SMOKE_EVIDENCE==='1')try{await context?.tracing.stop({path:path.join(root,'trace.zip')});}catch{}
   try{if(page&&app)await page.evaluate(()=>window.electronAPI.projects.setDirty(false));}catch{}
   if(app){const timer=setTimeout(()=>app.process()?.kill(),15000);timer.unref();try{await app.close();}catch{app.process()?.kill();}finally{clearTimeout(timer);}}else{try{await browser?.close();}catch{}}
-  report.finishedAt=new Date().toISOString();report.summary={passed:report.cases.filter(x=>x.status==='passed').length,failed:report.cases.filter(x=>x.status==='failed').length};writeReport();console.log(JSON.stringify(report.summary));
-  process.exitCode=report.fatal||report.summary.failed?1:0;
+  console.log(JSON.stringify({summary:report.summary,entry:report.entry,observations:report.observations,pageErrorCount:report.pageErrors.length}));
  }
 })();

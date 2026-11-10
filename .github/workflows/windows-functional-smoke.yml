@@ -1,7 +1,7 @@
-name: Windows download lifetime smoke (released packages)
+name: Windows cold magnet entry smoke (released package)
 on:
   push:
-    branches: [CZX2244/test/windows-download-lifetime-20261110]
+    branches: [CZX2244/test/windows-magnet-cold-20261110]
 concurrency:
   group: windows-functional-${{ github.ref }}
   cancel-in-progress: true
@@ -15,8 +15,9 @@ jobs:
       matrix:
         os: [windows-2022, windows-2025]
         flavor: [portable]
+        entry: [template, manual]
     env:
-      SMOKE_CASES: '01,03,14'
+      SMOKE_ENTRY: ${{ matrix.entry }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
@@ -81,5 +82,5 @@ jobs:
             "Tested artifact: ``$($data.artifactCommit)``" >> $env:GITHUB_STEP_SUMMARY
             "| Case | Result |`n|---|---|" >> $env:GITHUB_STEP_SUMMARY
             foreach ($case in $data.cases) { "| $($case.name) | $($case.status) |" >> $env:GITHUB_STEP_SUMMARY }
-            Write-Host (ConvertTo-Json -Depth 12 @{artifactCommit=$data.artifactCommit;platform=$data.platform;os=$data.os;flavor=$data.flavor;cases=@($data.cases | Select-Object name,status,ms,@{n='reason';e={($_.error -split "`n")[0]}});summary=$data.summary;fatal=($data.fatal -split "`n")[0]})
+            Write-Host (ConvertTo-Json -Depth 12 @{artifactCommit=$data.artifactCommit;platform=$data.platform;os=$data.os;flavor=$data.flavor;cases=@($data.cases | Select-Object name,status,ms,@{n='reason';e={($_.error -split "`n")[0]}});summary=$data.summary;entry=$data.entry;observations=$data.observations;pageErrorCount=$data.pageErrors.Count;fatal=($data.fatal -split "`n")[0]})
           } else { Write-Host 'No test report was produced.' }
