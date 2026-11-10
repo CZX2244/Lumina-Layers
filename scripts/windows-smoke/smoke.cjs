@@ -27,6 +27,7 @@ async function check(name, fn) {
     report.cases.push({ name, status: 'failed', ms: Date.now()-started, error: error.stack });
     try { fs.writeFileSync(path.join(root, name+'.txt'), await page.locator('body').innerText()); } catch {}
     console.error('FAIL', name, error.message);
+    try{await page.keyboard.press('Escape');}catch{}
   }
   if(process.env.SMOKE_EVIDENCE==='1')try { await page.screenshot({ path: path.join(root, name+'.png'), timeout: 10000 }); } catch {}
   writeReport(); console.log('END', name, report.cases.at(-1).status);
@@ -65,8 +66,8 @@ async function boot() {
     app.process().stderr?.on('data',d=>fs.appendFileSync(path.join(root,'electron-stderr.log'),d));
     context=app.context();
     // Native pickers are supplied paths by the harness; real IPC and disk writes run unchanged.
-    await app.evaluate(({dialog},dir)=>{
-      global.__smokeSaves=[];global.__smokeOpen=null;
+    await app.evaluate(({dialog,session},dir)=>{
+      global.__smokeSaves=[];global.__smokeOpen=null;global.__smokeDownloadURLs=[];session.defaultSession.on('will-download',(_event,item)=>global.__smokeDownloadURLs.push(item.getURL()));
       const pick=options=>{const base=String(options.defaultPath||'export.bin').split(/[\\/]/).pop();const file=dir+'/'+base;global.__smokeSaves.push(file);return file;};
       dialog.showSaveDialog=async(...args)=>({canceled:false,filePath:pick(args.at(-1))});
       dialog.showSaveDialogSync=(...args)=>pick(args.at(-1));
@@ -106,7 +107,14 @@ async function chooseLut() {
   const dialog=page.getByTestId('lut-picker-dialog');await dialog.waitFor();
   await dialog.getByTestId('lut-picker-brand-option-Aliz').click();
   await dialog.getByTestId('lut-picker-search-input').fill('Aliz&4色PLA&CMYW');
-  const choices=dialog.getByTestId('lut-picker-option');await choices.first().waitFor();
+  let choices=dialog.getByTestId('lut-picker-option');
+  await pause(500);
+  if(await choices.count()===0){
+    if(!report.lutCatalogMismatch){report.lutCatalogMismatch=true;report.cases.push({name:'06a-builtin-LUT-available-after-project-reopen',status:'failed',ms:0,error:'Fixture built-in LUT is absent from its brand after reopening/closing a project; checking refresh recovery.'});}
+    await dialog.locator('button').first().click();await pause(1000);
+    await dialog.getByTestId('lut-picker-brand-option-Aliz').click();await dialog.getByTestId('lut-picker-search-input').fill('Aliz&4色PLA&CMYW');
+  }
+  await choices.first().waitFor();
   if(await choices.first().getAttribute('aria-checked')!=='true')await choices.first().click();
   await dialog.getByRole('button',{name:'确认',exact:true}).click();
 }
@@ -128,7 +136,7 @@ async function generate() {
   const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;},180000);
   await until(()=>fs.existsSync(file)&&fs.statSync(file).size>0,60000);
   await pause(300);
-  lastArtifact=report.conversionResponses.slice(start).find(x=>x.url.endsWith('/generate')&&x.status===200)?.body;
+  const response=report.conversionResponses.slice(start).find(x=>x.url.endsWith('/generate')&&x.status===200)?.body;const actualUrl=await app.evaluate(()=>global.__smokeDownloadURLs.at(-1));lastArtifact={...response,download_url:actualUrl||response?.download_url};
   return inspectZip(file);
 }
 async function newProject(){
