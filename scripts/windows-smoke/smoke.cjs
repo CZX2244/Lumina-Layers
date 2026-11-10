@@ -27,6 +27,7 @@ async function check(name, fn) {
     report.cases.push({ name, status: 'failed', ms: Date.now()-started, error: error.stack });
     try { fs.writeFileSync(path.join(root, name+'.txt'), await page.locator('body').innerText()); } catch {}
     console.error('FAIL', name, error.message);
+    try{await page.keyboard.press('Escape');}catch{}
   }
   if(process.env.SMOKE_EVIDENCE==='1')try { await page.screenshot({ path: path.join(root, name+'.png'), timeout: 10000 }); } catch {}
   writeReport(); console.log('END', name, report.cases.at(-1).status);
@@ -65,8 +66,8 @@ async function boot() {
     app.process().stderr?.on('data',d=>fs.appendFileSync(path.join(root,'electron-stderr.log'),d));
     context=app.context();
     // Native pickers are supplied paths by the harness; real IPC and disk writes run unchanged.
-    await app.evaluate(({dialog},dir)=>{
-      global.__smokeSaves=[];global.__smokeOpen=null;
+    await app.evaluate(({dialog,session},dir)=>{
+      global.__smokeSaves=[];global.__smokeOpen=null;global.__smokeDownloadURLs=[];session.defaultSession.on('will-download',(_event,item)=>global.__smokeDownloadURLs.push(item.getURL()));
       const pick=options=>{const base=String(options.defaultPath||'export.bin').split(/[\\/]/).pop();const file=dir+'/'+base;global.__smokeSaves.push(file);return file;};
       dialog.showSaveDialog=async(...args)=>({canceled:false,filePath:pick(args.at(-1))});
       dialog.showSaveDialogSync=(...args)=>pick(args.at(-1));
@@ -106,7 +107,14 @@ async function chooseLut() {
   const dialog=page.getByTestId('lut-picker-dialog');await dialog.waitFor();
   await dialog.getByTestId('lut-picker-brand-option-Aliz').click();
   await dialog.getByTestId('lut-picker-search-input').fill('Aliz&4色PLA&CMYW');
-  const choices=dialog.getByTestId('lut-picker-option');await choices.first().waitFor();
+  let choices=dialog.getByTestId('lut-picker-option');
+  await pause(500);
+  if(await choices.count()===0){
+    if(report.projectReopened&&!report.lutCatalogMismatch){report.lutCatalogMismatch=true;report.cases.push({name:'06a-builtin-LUT-available-after-project-reopen',status:'failed',ms:0,error:'Fixture built-in LUT is absent from its brand after reopening/closing a project; checking refresh recovery.'});}
+    await dialog.locator('button').first().click();await pause(1000);
+    await dialog.getByTestId('lut-picker-brand-option-Aliz').click();await dialog.getByTestId('lut-picker-search-input').fill('Aliz&4色PLA&CMYW');
+  }
+  await choices.first().waitFor();
   if(await choices.first().getAttribute('aria-checked')!=='true')await choices.first().click();
   await dialog.getByRole('button',{name:'确认',exact:true}).click();
 }
@@ -128,7 +136,7 @@ async function generate() {
   const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;},180000);
   await until(()=>fs.existsSync(file)&&fs.statSync(file).size>0,60000);
   await pause(300);
-  lastArtifact=report.conversionResponses.slice(start).find(x=>x.url.endsWith('/generate')&&x.status===200)?.body;
+  const response=report.conversionResponses.slice(start).find(x=>x.url.endsWith('/generate')&&x.status===200)?.body;const actualUrl=await app.evaluate(()=>global.__smokeDownloadURLs.at(-1));lastArtifact={...response,download_url:actualUrl||response?.download_url};
   return inspectZip(file);
 }
 async function newProject(){
@@ -156,21 +164,6 @@ async function clearModal(){await page.keyboard.press('Escape');const close=page
     const p=await preview();const output=await generate();return {dimensions:await dimensions(),session:p.session_id,output};
   });
   if(process.env.SMOKE_DRY_LIMIT)return;
-  await check('04-project-save-and-reopen',async()=>{
-    if(!app)return {skipped:'local browser harness verification only'};
-    const before=(await savedFiles()).length;await page.getByTestId('project-bar').getByRole('button',{name:'保存',exact:true}).click();
-    const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;});
-    await until(()=>fs.existsSync(file)&&fs.statSync(file).size>0);const info=inspectZip(file);assert(file.endsWith('.lum'));
-    await newProject();await app.evaluate((_e,p)=>{global.__smokeOpen=p;},file);
-    await page.getByTestId('project-bar').getByRole('button',{name:'打开',exact:true}).click();
-    const discard=page.getByRole('button',{name:'放弃修改',exact:true});if(await discard.isVisible())await discard.click();
-    await until(async()=>Math.abs((await dimensions()).width-40)<0.1,60000);await preview();return info;
-  });
-  await check('05-download-survives-source-session-close',async()=>{
-    const body=lastArtifact;const url=body?.download_url;assert(url,'No successful generation response download_url');
-    const before=await page.request.get(new URL(url,page.url()).href);assert.equal(before.status(),200);
-    await newProject();const after=await page.request.get(new URL(url,page.url()).href);assert.equal(after.status(),200);return {url,before:before.status(),after:after.status()};
-  });
   await check('06-native-svg-preview-and-3mf',async()=>{await newProject();await setSwitch('上传后裁剪',false);await chooseLut();await importImage(svg);await size(40);const p=await preview();return {session:p.session_id,output:await generate()};});
   await check('07-magnet-preview-and-3mf',async()=>{
     await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-fridge-magnet').click();await size(40);
@@ -222,6 +215,23 @@ async function clearModal(){await page.keyboard.press('Escape');const close=page
     await storage.getByRole('button',{name:'清理所选',exact:true}).click();await storage.getByRole('status').waitFor();
     const after=await page.request.get(new URL(url,page.url()).href);assert.equal(after.status(),200,'Selective cleanup invalidated a live 1-hour download');return {url,before:before.status(),after:after.status(),agedFiles:files.length};
   });
+  await check('04-project-save-and-reopen',async()=>{
+    if(!app)return {skipped:'local browser harness verification only'};
+    await newProject();await setSwitch('上传后裁剪',false);await chooseLut();await importImage(png);await size(40);await preview();await generate();
+    const before=(await savedFiles()).length;await page.getByTestId('project-bar').getByRole('button',{name:'保存',exact:true}).click();
+    const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;});
+    await until(()=>fs.existsSync(file)&&fs.statSync(file).size>0);const info=inspectZip(file);assert(file.endsWith('.lum'));
+    await newProject();await app.evaluate((_e,p)=>{global.__smokeOpen=p;},file);
+    await page.getByTestId('project-bar').getByRole('button',{name:'打开',exact:true}).click();
+    const discard=page.getByRole('button',{name:'放弃修改',exact:true});if(await discard.isVisible())await discard.click();
+    await until(async()=>Math.abs((await dimensions()).width-40)<0.1,60000);await preview();report.projectReopened=true;return info;
+  });
+  await check('05-download-survives-source-session-close',async()=>{
+    const body=lastArtifact;const url=body?.download_url;assert(url,'No successful generation response download_url');
+    const before=await page.request.get(new URL(url,page.url()).href);assert.equal(before.status(),200);
+    await newProject();const after=await page.request.get(new URL(url,page.url()).href);assert.equal(after.status(),200);return {url,before:before.status(),after:after.status()};
+  });
+  await check('16-builtin-LUT-reselection-after-project-reopen',async()=>{await newProject();await chooseLut();return {fixtureSelected:true,neededRefresh:Boolean(report.lutCatalogMismatch)};});
  }catch(error){report.fatal=error.stack;console.error(error);}
  finally{
   if(process.env.SMOKE_EVIDENCE==='1')try{await context?.tracing.stop({path:path.join(root,'trace.zip')});}catch{}
