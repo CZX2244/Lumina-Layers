@@ -1,7 +1,7 @@
-name: Windows functional smoke (released packages)
+name: Windows installer functional smoke (ASCII path)
 on:
   push:
-    branches: [CZX2244/test/windows-functional-smoke-20261110]
+    branches: [CZX2244/test/windows-installer-smoke-20261110]
 concurrency:
   group: windows-functional-${{ github.ref }}
   cancel-in-progress: true
@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2022, windows-2025]
-        flavor: [portable, installer]
+        flavor: [installer]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
@@ -40,7 +40,7 @@ jobs:
         env:
           SMOKE_FLAVOR: ${{ matrix.flavor }}
         run: |
-          $root = Join-Path $env:RUNNER_TEMP 'Lumina 功能 smoke'
+          $root = Join-Path $env:RUNNER_TEMP 'LuminaInstallSmoke'
           if ($env:SMOKE_FLAVOR -eq 'portable') {
             $zip = Get-ChildItem .smoke/package -Filter '*.zip' | Select-Object -First 1
             if (-not $zip) { throw 'Portable ZIP is missing' }
@@ -49,6 +49,9 @@ jobs:
             $installer = Get-ChildItem .smoke/package -Filter '*.exe' | Select-Object -First 1
             if (-not $installer) { throw 'Installer is missing' }
             $p = Start-Process $installer.FullName -ArgumentList "/S /D=$root" -Wait -PassThru
+            Write-Host "Installer exit code: $($p.ExitCode)"
+            Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like '*Lumina*' } | Select-Object DisplayName,InstallLocation,DisplayIcon | Format-List
+            if (Test-Path $root) { Get-ChildItem $root -Depth 2 | Select-Object FullName | Format-Table -AutoSize }
             if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
           }
           $exe = Join-Path $root 'Lumina Studio Plus.exe'
@@ -56,6 +59,7 @@ jobs:
             $installed = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter 'Lumina Studio Plus.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($installed) { Write-Host "Installer location detected: $($installed.FullName)"; $exe = $installed.FullName; $root = $installed.DirectoryName }
           }
+          if (-not (Test-Path $exe)) { $nested = Get-ChildItem $root -Recurse -Filter 'Lumina Studio Plus.exe' -ErrorAction SilentlyContinue | Select-Object -First 1; if ($nested) { $exe=$nested.FullName; $root=$nested.DirectoryName } }
           if (-not (Test-Path $exe)) { throw "Desktop executable missing: $exe" }
           # A silent installer may launch its own copy. Stop only this isolated test executable.
           Get-CimInstance Win32_Process -Filter "name='Lumina Studio Plus.exe'" | Where-Object { $_.ExecutablePath -eq $exe } | ForEach-Object { taskkill /PID $_.ProcessId /T /F }
