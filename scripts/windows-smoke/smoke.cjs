@@ -21,6 +21,7 @@ async function until(fn, timeout = 30000) {
   throw new Error('Timed out waiting for condition');
 }
 async function check(name, fn) {
+  if(process.env.SMOKE_CASES&&!process.env.SMOKE_CASES.split(',').includes(name.split('-')[0]))return;
   const started = Date.now(); console.log('START', name);
   try { const evidence = await fn(); report.cases.push({ name, status: 'passed', ms: Date.now()-started, evidence }); }
   catch (error) {
@@ -75,7 +76,8 @@ async function boot() {
       dialog.showMessageBox=async()=>({response:1,checkboxChecked:false});
     },downloads);
   }
-  context.on('page',p=>p.on('pageerror',e=>report.pageErrors.push({url:p.url(),error:e.stack||String(e)})));
+  const dialogs=p=>p.on('dialog',d=>d.accept().catch(()=>{}));for(const p of context.pages())dialogs(p);
+  context.on('page',p=>{dialogs(p);p.on('pageerror',e=>report.pageErrors.push({url:p.url(),error:e.stack||String(e)}));});
   context.on('response',async r=>{
     const u=r.url();if(r.status()>=400&&u.includes('/api/')) report.httpErrors.push({url:u,status:r.status()});
     if(/\/api\/convert\/(preview|generate|puzzle-layout-preview)$/.test(u)) {
@@ -211,7 +213,7 @@ async function clearModal(){await page.keyboard.press('Escape');const close=page
     const files=[];const walk=dir=>{if(!fs.existsSync(dir))return;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const f=path.join(dir,e.name);if(e.isDirectory())walk(f);else if(/\.3mf$/i.test(e.name))files.push(f);}};walk(path.join(runtime,'output'));
     assert(files.length>0,'No generated runtime 3MF to age');const old=(Date.now()-11*60000)/1000;for(const f of files)fs.utimesSync(f,old,old);
     await page.getByTestId('studio-nav-settings').click();const storage=page.getByTestId('studio-storage');
-    await storage.getByRole('button',{name:'重新统计',exact:true}).click();const temp=storage.locator('li').filter({hasText:'临时文件'}).getByRole('checkbox');await temp.check();
+    await storage.getByRole('button',{name:'重新统计',exact:true}).click();const temp=storage.locator('li').filter({hasText:'临时文件'}).getByRole('checkbox');await temp.check();await storage.locator('li').filter({hasText:'预览模型'}).getByRole('checkbox').check();
     await storage.getByRole('button',{name:'清理所选',exact:true}).click();await storage.getByRole('status').waitFor();
     const after=await page.request.get(new URL(url,page.url()).href);assert.equal(after.status(),200,'Selective cleanup invalidated a live 1-hour download');return {url,before:before.status(),after:after.status(),agedFiles:files.length};
   });
@@ -234,6 +236,7 @@ async function clearModal(){await page.keyboard.press('Escape');const close=page
   await check('16-builtin-LUT-reselection-after-project-reopen',async()=>{await newProject();await chooseLut();return {fixtureSelected:true,neededRefresh:Boolean(report.lutCatalogMismatch)};});
  }catch(error){report.fatal=error.stack;console.error(error);}
  finally{
+  report.finishedAt=new Date().toISOString();report.summary={passed:report.cases.filter(x=>x.status==='passed').length,failed:report.cases.filter(x=>x.status==='failed').length};writeReport();process.exitCode=report.fatal||report.summary.failed?1:0;
   if(process.env.SMOKE_EVIDENCE==='1')try{await context?.tracing.stop({path:path.join(root,'trace.zip')});}catch{}
   try{if(page&&app)await page.evaluate(()=>window.electronAPI.projects.setDirty(false));}catch{}
   if(app){const timer=setTimeout(()=>app.process()?.kill(),15000);timer.unref();try{await app.close();}catch{app.process()?.kill();}finally{clearTimeout(timer);}}else{try{await browser?.close();}catch{}}

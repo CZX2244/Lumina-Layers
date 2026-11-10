@@ -1,7 +1,7 @@
-name: Windows functional smoke (released packages)
+name: Windows download lifetime smoke (released packages)
 on:
   push:
-    branches: [CZX2244/test/windows-functional-smoke-20261110]
+    branches: [CZX2244/test/windows-download-lifetime-20261110]
 concurrency:
   group: windows-functional-${{ github.ref }}
   cancel-in-progress: true
@@ -15,6 +15,8 @@ jobs:
       matrix:
         os: [windows-2022, windows-2025]
         flavor: [portable]
+    env:
+      SMOKE_CASES: '01,03,14'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
