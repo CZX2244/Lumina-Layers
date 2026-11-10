@@ -1,0 +1,79 @@
+name: Windows functional smoke (released packages)
+on:
+  push:
+    branches: [CZX2244/test/windows-functional-smoke-20261110]
+concurrency:
+  group: windows-functional-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+        flavor: [portable, installer]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test harness dependencies
+        working-directory: scripts/windows-smoke
+        run: pnpm install --frozen-lockfile
+      - name: Download the unchanged released package
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 42634978786
+          name: LuminaPlus-${{ matrix.flavor }}
+          path: .smoke/package
+      - name: Prepare portable or install NSIS package
+        shell: pwsh
+        env:
+          SMOKE_FLAVOR: ${{ matrix.flavor }}
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'Lumina 功能 smoke'
+          if ($env:SMOKE_FLAVOR -eq 'portable') {
+            $zip = Get-ChildItem .smoke/package -Filter '*.zip' | Select-Object -First 1
+            if (-not $zip) { throw 'Portable ZIP is missing' }
+            Expand-Archive $zip.FullName -DestinationPath $root -Force
+          } else {
+            $installer = Get-ChildItem .smoke/package -Filter '*.exe' | Select-Object -First 1
+            if (-not $installer) { throw 'Installer is missing' }
+            $p = Start-Process $installer.FullName -ArgumentList "/S /D=$root" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+          }
+          $exe = Join-Path $root 'Lumina Studio Plus.exe'
+          if (-not (Test-Path $exe)) { throw "Desktop executable missing: $exe" }
+          # A silent installer may launch its own copy. Stop only this isolated test executable.
+          Get-CimInstance Win32_Process -Filter "name='Lumina Studio Plus.exe'" | Where-Object { $_.ExecutablePath -eq $exe } | ForEach-Object { taskkill /PID $_.ProcessId /T /F }
+          $global:LASTEXITCODE = 0
+          $build = Get-Content (Join-Path $root 'resources/app/BUILD_INFO.json') -Raw | ConvertFrom-Json
+          if ($build.revision -ne '75f1127ed4a2874d612503c72b08b678cb9d5e30') { throw "Unexpected artifact revision: $($build.revision)" }
+          "SMOKE_EXE=$exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "SMOKE_OUTPUT=$env:RUNNER_TEMP\functional-results" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run packaged Electron functional smoke
+        shell: pwsh
+        env:
+          SMOKE_FLAVOR: ${{ matrix.flavor }}
+        run: node scripts/windows-smoke/smoke.cjs
+      - name: Summarize synthetic-fixture test outcomes only
+        if: always()
+        shell: pwsh
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP 'functional-results/report.json'
+          if (Test-Path $report) {
+            $data = Get-Content $report -Raw | ConvertFrom-Json
+            "Tested artifact: ``$($data.artifactCommit)``" >> $env:GITHUB_STEP_SUMMARY
+            "| Case | Result |`n|---|---|" >> $env:GITHUB_STEP_SUMMARY
+            foreach ($case in $data.cases) { "| $($case.name) | $($case.status) |" >> $env:GITHUB_STEP_SUMMARY }
+            Write-Host (ConvertTo-Json -Depth 12 @{artifactCommit=$data.artifactCommit;platform=$data.platform;os=$data.os;flavor=$data.flavor;cases=@($data.cases | Select-Object name,status,ms,@{n='reason';e={($_.error -split "`n")[0]}});summary=$data.summary;fatal=($data.fatal -split "`n")[0]})
+          } else { Write-Host 'No test report was produced.' }
