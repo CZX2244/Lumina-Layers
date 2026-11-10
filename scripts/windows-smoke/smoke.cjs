@@ -66,8 +66,8 @@ async function boot() {
     context=app.context();
     // Native pickers are supplied paths by the harness; real IPC and disk writes run unchanged.
     await app.evaluate(({dialog},dir)=>{
-      const p=require('node:path'); global.__smokeSaves=[];global.__smokeOpen=null;
-      const pick=options=>{const file=p.join(dir,p.basename(options.defaultPath||'export.bin'));global.__smokeSaves.push(file);return file;};
+      global.__smokeSaves=[];global.__smokeOpen=null;
+      const pick=options=>{const base=String(options.defaultPath||'export.bin').split(/[\\/]/).pop();const file=dir+'/'+base;global.__smokeSaves.push(file);return file;};
       dialog.showSaveDialog=async(...args)=>({canceled:false,filePath:pick(args.at(-1))});
       dialog.showSaveDialogSync=(...args)=>pick(args.at(-1));
       dialog.showOpenDialog=async()=>global.__smokeOpen?{canceled:false,filePaths:[global.__smokeOpen]}:{canceled:true,filePaths:[]};
@@ -186,7 +186,7 @@ async function clearModal(){await page.keyboard.press('Escape');const close=page
   });
   await check('08b-puzzle-assembly-png',async()=>{
     await page.getByTestId('studio-nav-home').click();await page.getByTestId('studio-template-puzzle').click();await size(80);
-    for(const label of ['行数 value','列数 value']){const input=page.getByRole('textbox',{name:label,exact:true});await input.fill('2');await input.press('Enter');}
+    const fields=page.getByTestId('studio-product-puzzle').locator('input[type=number]');for(const i of [0,1]){await fields.nth(i).fill('2');await fields.nth(i).press('Tab');}
     await preview();const button=page.getByTestId('studio-assembly').getByRole('button');await until(()=>button.isEnabled(),60000);
     const before=(await savedFiles()).length;const started=Date.now();await button.click();if(!app)return {skipped:'native save checked on Windows'};
     const file=await until(async()=>{const list=await savedFiles();return list.length>before?list.at(-1):null;});
@@ -225,7 +225,8 @@ async function clearModal(){await page.keyboard.press('Escape');const close=page
  }catch(error){report.fatal=error.stack;console.error(error);}
  finally{
   if(process.env.SMOKE_EVIDENCE==='1')try{await context?.tracing.stop({path:path.join(root,'trace.zip')});}catch{}
-  try{if(app){await page.evaluate(()=>window.electronAPI.projects.setDirty(false));await app.close();}else await browser?.close();}catch{}
+  try{if(page&&app)await page.evaluate(()=>window.electronAPI.projects.setDirty(false));}catch{}
+  if(app){const timer=setTimeout(()=>app.process()?.kill(),15000);timer.unref();try{await app.close();}catch{app.process()?.kill();}finally{clearTimeout(timer);}}else{try{await browser?.close();}catch{}}
   report.finishedAt=new Date().toISOString();report.summary={passed:report.cases.filter(x=>x.status==='passed').length,failed:report.cases.filter(x=>x.status==='failed').length};writeReport();console.log(JSON.stringify(report.summary));
   process.exitCode=report.fatal||report.summary.failed?1:0;
  }

@@ -52,6 +52,10 @@ jobs:
             if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
           }
           $exe = Join-Path $root 'Lumina Studio Plus.exe'
+          if ($env:SMOKE_FLAVOR -eq 'installer' -and -not (Test-Path $exe)) {
+            $installed = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter 'Lumina Studio Plus.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($installed) { Write-Host "Installer location detected: $($installed.FullName)"; $exe = $installed.FullName; $root = $installed.DirectoryName }
+          }
           if (-not (Test-Path $exe)) { throw "Desktop executable missing: $exe" }
           # A silent installer may launch its own copy. Stop only this isolated test executable.
           Get-CimInstance Win32_Process -Filter "name='Lumina Studio Plus.exe'" | Where-Object { $_.ExecutablePath -eq $exe } | ForEach-Object { taskkill /PID $_.ProcessId /T /F }
