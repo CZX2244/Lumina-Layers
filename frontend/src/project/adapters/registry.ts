@@ -2,11 +2,13 @@ import type { ProjectSnapshot, WorkflowDocument } from "../types";
 import { assertRestoreIsCurrent, type PreparedProjectRestore, type ProjectAdapter, type ProjectRestoreContext } from "./types";
 import { createConverterProjectAdapter } from "./converterAdapter";
 import { createWorkflowAdapters } from "./workflows";
-import { createWorkshopProjectAdapter } from "./workshopAdapter";
 
 export class ProjectAdapterRegistry {
   private readonly adapters = new Map<string, ProjectAdapter>();
-  constructor(adapters: ProjectAdapter[] = [createConverterProjectAdapter(), ...createWorkflowAdapters(), createWorkshopProjectAdapter()]) {
+  // The Creative Workshop needs the network, so the personal build has no
+  // Workshop adapter: projects that contain one open in limited mode.
+  // 个人版不含创意工坊适配器：带工坊内容的工程以受限方式打开（跳过该部分）。
+  constructor(adapters: ProjectAdapter[] = [createConverterProjectAdapter(), ...createWorkflowAdapters()]) {
     for (const adapter of adapters) this.register(adapter);
   }
   register(adapter: ProjectAdapter) {

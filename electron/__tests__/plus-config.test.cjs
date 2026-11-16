@@ -6,10 +6,17 @@ const os = require("node:os");
 const path = require("node:path");
 const { isNewerRelease, plusConfigEnv, resolveDataFolder, scrubLegacyPlusConfig } = require("../plus-config.cjs");
 
-test("bug reports stay local and no registry variables are passed", () => {
-  assert.deepEqual(plusConfigEnv({}), { LUMINA_FEEDBACK_SERVER_URL: "off" });
-  assert.deepEqual(plusConfigEnv({ LUMINA_FEEDBACK_SERVER_URL: "https://mine.example" }), {});
-  assert.equal(Object.keys(plusConfigEnv({})).some((key) => key.includes("REGISTRY")), false);
+test("backend network features are forced off whatever the environment says", () => {
+  const env = plusConfigEnv({ LUMINA_FEEDBACK_SERVER_URL: "https://mine.example", LUMINA_MATERIAL_REGISTRY_URL: "https://r.example" });
+  assert.equal(env.LUMINA_FEEDBACK_SERVER_URL, "off", "empty would fall back to the official server");
+  for (const key of ["LUMINA_MATERIAL_REGISTRY_URL", "LUMINA_MATERIAL_REGISTRY_FALLBACK_URL", "LUMINA_MATERIAL_REGISTRY_TOKEN",
+    "LUMINA_MATERIAL_REGISTRY_TEAM_TOKEN", "LUMINA_LUT_REGISTRY_URL", "LUMINA_LUT_REGISTRY_FALLBACK_URL", "LUMINA_LUT_REGISTRY_TOKEN",
+    "LUMINA_MATERIALS_SEED_URL", "LUMINA_DATABASE_URL"]) {
+    assert.equal(env[key], "", key);
+  }
+  assert.equal(env.LUMINA_MATERIAL_SYNC_STARTUP_REFRESH, "0");
+  assert.equal(env.LUMINA_MATERIAL_SYNC_REFRESH_INTERVAL_S, "0");
+  assert.equal(env.LUMINA_WORKSHOP_NETWORK, "off");
 });
 
 test("legacy registry settings and tokens are scrubbed from userData", t => {

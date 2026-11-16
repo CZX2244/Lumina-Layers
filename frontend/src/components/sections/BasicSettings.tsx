@@ -482,10 +482,6 @@ export default function BasicSettings() {
     applyPreparedImport("converter");
   }, [applyPreparedImport]);
 
-  const handleImportContinueEditing = useCallback(() => {
-    applyPreparedImport("workshop");
-  }, [applyPreparedImport]);
-
   const handleImportCancel = useCallback(() => {
     revokeImportCoverUrl(importPreview?.coverUrl ?? null);
     setImportDialogOpen(false);
@@ -1646,7 +1642,6 @@ export default function BasicSettings() {
         preview={importPreview}
         source={importSource}
         onConfirm={handleImportConfirm}
-        onContinueEditing={handleImportContinueEditing}
         onCancel={handleImportCancel}
         isLoading={importLoading}
       />

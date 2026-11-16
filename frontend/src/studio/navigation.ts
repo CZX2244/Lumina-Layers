@@ -38,7 +38,6 @@ export const STUDIO_NAV_GROUPS: StudioNavGroup[] = [
     items: [
       { tab: "converter", labelKey: "tab.converter", icon: "image", keywords: "3mf convert image 图片 转换 生成 预览" },
       { tab: "vectorizer", labelKey: "tab.vectorizer", icon: "vector", keywords: "svg vector 矢量" },
-      { tab: "workshop", labelKey: "tab.workshop", icon: "workshop", keywords: "module 工坊 拼豆 bead" },
     ],
   },
   {

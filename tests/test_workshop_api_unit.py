@@ -1158,3 +1158,37 @@ def test_runtime_and_lifecycle_errors_are_deterministic(
     assert invalid_version.status_code == 404
     assert invalid_identity.status_code == 422
     assert "Traceback" not in runtime.text
+
+
+def test_network_off_refuses_catalog_and_remote_installs_without_network(
+    api_bundle,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Local-only builds set LUMINA_WORKSHOP_NETWORK=off: no Registry or GitHub access."""
+    client, installer, archive, _registry = api_bundle
+    install_direct(installer, archive)
+    monkeypatch.setenv("LUMINA_WORKSHOP_NETWORK", "off")
+
+    class NoNetworkRegistry:
+        def refresh(self):
+            raise AssertionError("Registry must not be contacted when the network is off")
+
+    def no_github(*_args, **_kwargs):
+        raise AssertionError("GitHub must not be contacted when the network is off")
+
+    monkeypatch.setattr(workshop_router, "get_workshop_registry_client", lambda: NoNetworkRegistry())
+    monkeypatch.setattr(workshop_router, "resolve_github_release_package", no_github)
+
+    catalog = client.get("/api/workshop/v1/catalog")
+    registry_install = client.post("/api/workshop/v1/install/registry", json={"module_id": "fixture.hello"})
+    github_install = client.post(
+        "/api/workshop/v1/install/github",
+        json={"repository_url": REPOSITORY, "version": "1.0.0"},
+    )
+
+    for response in (catalog, registry_install, github_install):
+        assert response.status_code == 403
+        assert response.json()["detail"] == workshop_router.WORKSHOP_NETWORK_DISABLED_DETAIL
+    modules = client.get("/api/workshop/v1/modules")
+    assert modules.status_code == 200
+    assert modules.json()["modules"][0]["module_id"] == "fixture.hello"

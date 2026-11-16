@@ -155,25 +155,17 @@ describe("App Widget Toggles", () => {
     expect(screen.queryByTestId("widget-reset-layout")).not.toBeInTheDocument();
   });
 
-  it("opens Creative Workshop without exposing converter widget controls", async () => {
+  // Personal build: the Creative Workshop needs the network, so it has no tab
+  // and an old route to it lands on the converter.
+  it("offers no Creative Workshop tab and routes old workshop links to the converter", async () => {
     render(<App />);
     await screen.findByTestId("tab-converter");
-    await waitFor(() => {
-      expect(screen.getByTestId("header-menu-button")).toHaveAttribute(
-        "data-backend-status",
-        "ok",
-      );
-    });
+    expect(screen.queryByTestId("tab-workshop")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("tab-workshop"));
+    act(() => useWidgetStore.getState().setActiveTab("workshop"));
 
-    await screen.findByRole("heading", { name: "创意工坊" });
-    expect(
-      screen.getByTestId("panel-controls-toggle").parentElement,
-    ).toHaveClass("invisible");
-    expect(
-      screen.queryByTestId("widget-toggle-basic-settings"),
-    ).not.toBeInTheDocument();
+    await waitFor(() => expect(useWidgetStore.getState().activeTab).toBe("converter"));
+    expect(screen.queryByRole("heading", { name: "创意工坊" })).not.toBeInTheDocument();
   });
 
   it("converter tab widgets are visible by default", async () => {

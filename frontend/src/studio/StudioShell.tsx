@@ -28,8 +28,6 @@ import LutDetailsPanel from "../components/LutDetailsPanel";
 import FiveColorQueryPanel from "../components/FiveColorQueryPanel";
 import SettingsPanel from "../components/SettingsPanel";
 import VectorizerPanel from "../components/VectorizerPanel";
-import WorkshopPanel from "../workshop/WorkshopPanel";
-import { useWorkshopProjectRuntime } from "../project/workshopRuntime";
 import { StudioSidebar } from "./StudioSidebar";
 import { HomeView } from "./HomeView";
 import { ConverterWorkbench } from "./ConverterWorkbench";
@@ -173,7 +171,6 @@ function SavedFileToast() {
 function PageContent({ suspended }: { suspended: boolean }) {
   const view = useStudioPrefsStore((state) => state.view);
   const activeTab = useWidgetStore((state) => state.activeTab);
-  const workshopMounted = useWorkshopProjectRuntime((state) => state.mounted);
   if (view === "home") return <HomeView />;
   return (
     <>
@@ -197,9 +194,6 @@ function PageContent({ suspended }: { suspended: boolean }) {
       {activeTab === "lut-compare" && <LutComparePanel />}
       {activeTab === "five-color" && <div className="flex h-full min-h-0"><FiveColorQueryPanel /></div>}
       {activeTab === "vectorizer" && <VectorizerPanel />}
-      {(workshopMounted || activeTab === "workshop") && (
-        <div className={activeTab === "workshop" ? "h-full min-h-0" : "hidden"}><WorkshopPanel /></div>
-      )}
       {activeTab === "settings" && (
         <div className="flex h-full min-h-0 flex-col overflow-y-auto">
           <PlusSettings />

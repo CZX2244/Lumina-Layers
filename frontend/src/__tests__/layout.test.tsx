@@ -64,11 +64,12 @@ describe("Widget Workspace Layout", () => {
     expect(screen.getByTestId("tab-lut-management")).toBeInTheDocument();
     expect(screen.getByTestId("tab-material-management")).toBeInTheDocument();
     expect(screen.getByTestId("tab-vectorizer")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-workshop")).toBeInTheDocument();
+    // Personal build: no Creative Workshop (it needs the network).
+    expect(screen.queryByTestId("tab-workshop")).not.toBeInTheDocument();
     expect(screen.getByTestId("tab-settings")).toBeInTheDocument();
   });
 
-  it("places Creative Workshop between Vectorizer and Settings", async () => {
+  it("orders the local top-level tabs without the Creative Workshop", async () => {
     render(<App />);
     await screen.findByTestId("tab-converter");
 
@@ -82,7 +83,6 @@ describe("Widget Workspace Layout", () => {
       "tab-lut-management",
       "tab-material-management",
       "tab-vectorizer",
-      "tab-workshop",
       "tab-settings",
     ]);
   });

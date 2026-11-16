@@ -12,10 +12,15 @@ import { useWidgetStore } from "../stores/widgetStore";
 import { useProjectSessionStore } from "../stores/projectSessionStore";
 import type { TabId } from "../types/widget";
 
-/** Cloud library pages are disabled in the personal build; mirrors navigation.ts. */
+/**
+ * Pages that need the network are disabled in the personal build (local only):
+ * the cloud libraries and the Creative Workshop. Mirrors navigation.ts.
+ * 个人版只靠本地：云库与创意工坊页面停用，任何跳转都落到对应的本地页面。
+ */
 export const CLOUD_TAB_FALLBACK: Partial<Record<TabId, TabId>> = {
   "material-cloud-sync": "material-library",
   "lut-cloud-sync": "lut-library",
+  workshop: "converter",
 };
 
 export type UiShell = "studio" | "classic";

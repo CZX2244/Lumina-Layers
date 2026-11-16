@@ -63,8 +63,6 @@ import LutManagerPanel from "./components/LutManagerPanel";
 import FiveColorQueryPanel from "./components/FiveColorQueryPanel";
 import SettingsPanel from "./components/SettingsPanel";
 import VectorizerPanel from "./components/VectorizerPanel";
-import WorkshopPanel from "./workshop/WorkshopPanel";
-import { useWorkshopProjectRuntime } from "./project/workshopRuntime";
 import { useSingleStageStore } from "./stores/singleStageStore";
 import { useExtractorStore } from "./stores/extractorStore";
 import { collectConverterKeepFileIds, useConverterStore } from "./stores/converter";
@@ -304,7 +302,6 @@ function AppContent({ connected }: { connected: boolean | null }) {
     : "px-3 sm:px-4 lg:px-6";
 
   const [announcementReady, setAnnouncementReady] = useState(false);
-  const workshopMounted = useWorkshopProjectRuntime((state) => state.mounted);
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [infoPage, setInfoPage] = useState<"about" | "credits" | null>(null);
   const infoOpen = infoPage !== null;
@@ -344,9 +341,6 @@ function AppContent({ connected }: { connected: boolean | null }) {
     setBugReportPreset("");
   }, [dismissErrorTicketPrompt]);
   const activeTab = useWidgetStore((s) => s.activeTab);
-  useEffect(() => {
-    if (activeTab === "workshop") useWorkshopProjectRuntime.setState({ mounted: true });
-  }, [activeTab]);
   const activeConverterSubTab = useWidgetStore((s) => s.activeConverterSubTab);
   const setActiveTab = useWidgetStore((s) => s.setActiveTab);
   const converterEntrySequence = useRef(0);
@@ -662,7 +656,7 @@ function AppContent({ connected }: { connected: boolean | null }) {
           </div>
         )}
         {activeTab === 'vectorizer' && <VectorizerPanel />}
-        {(workshopMounted || activeTab === "workshop") && <div className={activeTab === "workshop" ? "h-full min-h-0" : "hidden"}><WorkshopPanel /></div>}
+        {/* The Creative Workshop needs the network; the personal build does not mount it. */}
         {activeTab === 'settings' && <SettingsPanel />}
         </div>
       </main>

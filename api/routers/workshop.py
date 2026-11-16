@@ -160,6 +160,24 @@ def _raise_workshop_http_error(
     raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
+_WORKSHOP_NETWORK_ENV = "LUMINA_WORKSHOP_NETWORK"
+_WORKSHOP_NETWORK_OFF_VALUES = frozenset({"off", "0", "false", "no"})
+WORKSHOP_NETWORK_DISABLED_DETAIL = (
+    "Creative Workshop network access is turned off in this build. "
+    "Installed modules and local packages still work."
+)
+
+
+def _require_workshop_network() -> None:
+    """Refuse Registry/GitHub access when the build runs local only.
+
+    当前构建只使用本地时，拒绝访问工坊 Registry 与 GitHub。
+    """
+    value = os.environ.get(_WORKSHOP_NETWORK_ENV, "").strip().casefold()
+    if value in _WORKSHOP_NETWORK_OFF_VALUES:
+        raise HTTPException(status_code=403, detail=WORKSHOP_NETWORK_DISABLED_DETAIL)
+
+
 def _install_error_status(exc: WorkshopInstallError) -> int:
     message = str(exc).casefold()
     if (
@@ -433,6 +451,7 @@ def workshop_catalog() -> WorkshopCatalogResponse:
     返回可信 Registry 中的公开模块元数据。
     """
 
+    _require_workshop_network()
     try:
         result = get_workshop_registry_client().refresh()
     except (WorkshopRegistryError, OSError) as exc:
@@ -608,6 +627,7 @@ def workshop_install_registry(
     安装从可信 Registry 中选出的精确候选版本。
     """
 
+    _require_workshop_network()
     archive_path: Path | None = None
     try:
         result = get_workshop_registry_client().refresh()
@@ -730,6 +750,7 @@ def workshop_install_github(
     从精确指定的 GitHub Release 安装标准模块包。
     """
 
+    _require_workshop_network()
     archive_path: Path | None = None
     try:
         archive_path = resolve_github_release_package(

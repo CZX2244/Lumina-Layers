@@ -76,7 +76,7 @@ const PRIMARY_TAB_LIST: { id: PrimaryTabId; titleKey: string }[] = [
   { id: 'lut-management', titleKey: 'tab.lutManagement' },
   { id: 'material-management', titleKey: 'tab.materialManagement' },
   { id: 'vectorizer', titleKey: 'tab.vectorizer' },
-  { id: 'workshop', titleKey: 'tab.workshop' },
+  // The Creative Workshop needs the network; the personal build is local only.
   { id: 'settings', titleKey: 'tab.settings' },
 ];
 

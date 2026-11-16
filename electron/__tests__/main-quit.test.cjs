@@ -434,12 +434,15 @@ test("dist desktop serves the built frontend from the backend without Node or Vi
   assert.equal(f.errors.length, 0);
 });
 
-test("dist desktop keeps data locations the user already configured", async t => {
+test("dist desktop keeps data locations the user configured but forces network features off", async t => {
   const f = await fixture(t, "win32", "healthy", undefined, {
     env: { LUMINA_ELECTRON_FRONTEND: "dist", LUMINA_FEEDBACK_SERVER_URL: "https://feedback.example", LUMINA_OUTPUT_DIR: "D:\\Lumina\\out" },
   });
   const backendEnv = f.children[0].options.env;
-  assert.equal(backendEnv.LUMINA_FEEDBACK_SERVER_URL, "https://feedback.example");
+  // The fixture's process env also carries LUMINA_MATERIAL_REGISTRY_URL.
+  assert.equal(backendEnv.LUMINA_FEEDBACK_SERVER_URL, "off");
+  assert.equal(backendEnv.LUMINA_MATERIAL_REGISTRY_URL, "");
+  assert.equal(backendEnv.LUMINA_WORKSHOP_NETWORK, "off");
   assert.equal(backendEnv.LUMINA_OUTPUT_DIR, "D:\\Lumina\\out");
 });
 

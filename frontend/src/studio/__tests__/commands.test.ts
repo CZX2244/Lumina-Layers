@@ -47,10 +47,15 @@ describe("studio navigation", () => {
     for (const tab of ["gradient-card-extract", "extractor", "lut-compare"]) reachable.add(tab);
     for (const tab of ["converter", "calibration", "extractor", "gradient-card-generate", "gradient-card-extract", "material-library",
       "material-recipe", "lut-library", "lut-manager", "lut-details", "lut-compare",
-      "five-color", "vectorizer", "workshop", "settings"]) {
+      "five-color", "vectorizer", "settings"]) {
       expect(reachable.has(tab), tab).toBe(true);
       expect(findNavItem(tab as never), tab).not.toBeNull();
     }
+  });
+
+  it("offers no Creative Workshop (it needs the network) and routes old links to the converter", () => {
+    expect(allStudioNavItems().map((item) => item.tab)).not.toContain("workshop");
+    expect(localTabFor("workshop")).toBe("converter");
   });
 
   it("offers no cloud library pages and routes old links to the local library", () => {
