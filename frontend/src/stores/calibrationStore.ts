@@ -339,15 +339,19 @@ export const useCalibrationStore = create<
 registerGeneratedArtifactInvalidator(({ preservePreviews, source }) => {
   if (source === "defaults" && workflowRuntime("calibration")?.settings) return;
   calibrationGenerateSequence += 1;
+  const current = useCalibrationStore.getState();
   useCalibrationStore.setState({
     isLoading: false,
     error: null,
     downloadUrl: null,
     threemfDiskPath: null,
     statusMessage: null,
-    warnings: [],
+    // Keep already-empty lists: a fresh [] counts as a project change, and
+    // settings loading at start-up invalidates before the user did anything.
+    // 已为空的列表保持原引用，否则启动加载设置时会被当成工程修改。
+    warnings: current.warnings.length ? [] : current.warnings,
     manifestUrl: null,
-    singleStageJobs: [],
+    singleStageJobs: current.singleStageJobs.length ? [] : current.singleStageJobs,
     ...(preservePreviews
       ? {}
       : {

@@ -25,6 +25,17 @@ it("retains the written file handle when the recent-project database fails", asy
   expect(result).toMatchObject({ persisted: true, entry: { handle: target.handle, catalogWarning: expect.any(String) } });
 });
 
+it("reports a browser download as not written, so it cannot clear unsaved changes", async () => {
+  vi.spyOn(indexedDB, "open").mockImplementation(() => { throw new Error("catalog unavailable"); });
+  const createObjectURL = vi.fn(() => "blob:project");
+  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const result = await saveProjectFile(snapshot(), null, false);
+  expect(click).toHaveBeenCalledOnce();
+  expect(createObjectURL).toHaveBeenCalledOnce();
+  expect(result?.persisted).toBe(false);
+});
+
 it("uses an existing PNG cover without waiting for another image decoder", async () => {
   vi.stubGlobal("createImageBitmap", () => new Promise(() => {}));
   const project = snapshot();
