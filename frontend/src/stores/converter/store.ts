@@ -7307,7 +7307,18 @@ export const useConverterStore = create<ConverterState & ConverterActions>()(
         // Update aspect ratio from cropped dimensions
         const ratio = response.width / response.height;
 
+        // "Crop after upload" opens the dialog on the auto-trimmed image. Applying
+        // it unchanged (whole image, no rotation) keeps the trim record, so the
+        // notice, "restore original" and the model-texturing swap still work; a
+        // real crop or rotation is the user's own edit and ends it.
+        // 上传后裁剪对话框未做改动就应用时保留裁边记录；真正裁切或旋转后不再还原。
+        const trim = currentState.importTrim;
+        const croppedTrimmedImage = trim?.kind === "trimmed" && trim.file === state.imageFile;
+        const unchangedCrop = croppedTrimmedImage && !rotation && x === 0 && y === 0
+          && width === trim.toWidth && height === trim.toHeight;
+
         set({
+          ...(croppedTrimmedImage ? { importTrim: unchangedCrop ? { ...trim, file: croppedFile } : null } : {}),
           imageFile: croppedFile,
           imagePreviewUrl: newPreviewUrl,
           ...buildImageAspectRatioState({ ...currentState, aspectRatio: null }, ratio),

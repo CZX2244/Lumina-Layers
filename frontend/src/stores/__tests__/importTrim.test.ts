@@ -10,6 +10,15 @@ vi.mock("../../utils/trimTransparentMargins", () => ({ trimTransparentMargins: t
 vi.mock("../../api/system", () => ({
   uploadImagePreview: vi.fn(),
 }));
+const cropMock = vi.hoisted(() => vi.fn());
+vi.mock("../../api/converter", async () => ({
+  ...await vi.importActual<typeof import("../../api/converter")>("../../api/converter"),
+  cropImage: cropMock,
+}));
+vi.mock("../../api/client", async () => ({
+  ...await vi.importActual<typeof import("../../api/client")>("../../api/client"),
+  downloadResourceBlob: vi.fn(async () => new Blob(["cropped"], { type: "image/png" })),
+}));
 
 import { DEFAULT_STATE, useConverterStore } from "../converter";
 import { resolveSourceFile } from "../../utils/sourceFileOrigins";
@@ -95,6 +104,42 @@ describe("model texturing keeps the original canvas", () => {
     useConverterStore.getState().setModelSurfaceEnabled(true);
 
     expect(useConverterStore.getState().imageFile).toBe(cropped);
+  });
+});
+
+describe("crop after upload", () => {
+  beforeEach(() => {
+    cropMock.mockReset();
+    cropMock.mockImplementation(async (_file: File, _x: number, _y: number, width: number, height: number) => ({ cropped_url: "/api/files/c", width, height }));
+  });
+
+  it("keeps the trim when the crop dialog is applied unchanged", async () => {
+    await useConverterStore.getState().importImageFiles([original]);
+    await useConverterStore.getState().submitCrop(0, 0, trimInfo.toWidth, trimInfo.toHeight, 0);
+
+    const state = useConverterStore.getState();
+    expect(state.imageFile).not.toBe(trimmed);
+    expect(state.importTrim).toMatchObject({ kind: "trimmed", file: state.imageFile, original });
+
+    state.setModelSurfaceEnabled(true);
+    expect(useConverterStore.getState().imageFile).toBe(original);
+  });
+
+  it("ends the trim record after a real crop, and texturing keeps the cropped image", async () => {
+    await useConverterStore.getState().importImageFiles([original]);
+    await useConverterStore.getState().submitCrop(10, 0, 120, trimInfo.toHeight, 0);
+
+    const cropped = useConverterStore.getState().imageFile;
+    expect(useConverterStore.getState().importTrim).toBeNull();
+    useConverterStore.getState().setModelSurfaceEnabled(true);
+    expect(useConverterStore.getState().imageFile).toBe(cropped);
+  });
+
+  it("ends the trim record after a rotation", async () => {
+    await useConverterStore.getState().importImageFiles([original]);
+    useConverterStore.setState({ imagePreviewUrl: null });
+    await useConverterStore.getState().submitCrop(0, 0, trimInfo.toWidth, trimInfo.toHeight, 90);
+    expect(useConverterStore.getState().importTrim).toBeNull();
   });
 });
 
