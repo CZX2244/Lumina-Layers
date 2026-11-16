@@ -615,9 +615,10 @@ describe("BasicSettings", () => {
     expect(screen.getByText("导入", { exact: true })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "裁切与旋转" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(within(screen.getByRole("dialog")).getByRole("img")).toHaveAttribute(
-      "src", "blob:edited-image",
-    );
+    // cropperjs adds its own copy of the picture; every image in the dialog is the edited one.
+    const editedImages = within(screen.getByRole("dialog")).getAllByRole("img");
+    expect(editedImages.length).toBeGreaterThan(0);
+    for (const image of editedImages) expect(image).toHaveAttribute("src", "blob:edited-image");
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(useConverterStore.getState().imageFile).toBe(file);
@@ -663,9 +664,9 @@ describe("BasicSettings", () => {
       );
 
       fireEvent.click(screen.getByRole("button", { name: "裁切与旋转" }));
-      expect(within(screen.getByRole("dialog")).getByRole("img")).toHaveAttribute(
-        "src", "blob:large-source",
-      );
+      const cropImages = within(screen.getByRole("dialog")).getAllByRole("img");
+      expect(cropImages.length).toBeGreaterThan(0);
+      for (const image of cropImages) expect(image).toHaveAttribute("src", "blob:large-source");
     } finally {
       getContext.mockRestore();
       toBlob.mockRestore();
