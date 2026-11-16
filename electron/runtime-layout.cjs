@@ -58,6 +58,7 @@ function distDataEnv({ userData, env = {} }) {
     LUMINA_CLOUD_LUT_DIR: path.join(userData, "lut", "Cloud"),
     LUMINA_LOG_DIR: path.join(userData, "backend-logs"),
     LUMINA_FEEDBACK_DUMP_DIR: path.join(userData, "feedback"),
+    LUMINA_CUSTOM_3MF_TEMPLATE_DIR: path.join(userData, "3mf-templates"),
     NUMBA_CACHE_DIR: path.join(userData, "numba-cache"),
     PYTHONUTF8: "1",
     PYTHONDONTWRITEBYTECODE: "1",
@@ -75,13 +76,18 @@ function distDataEnv({ userData, env = {} }) {
  * Windows' built-in ZIP extraction silently skips files whose full path is
  * longer than 260 characters, so a missing sentinel means the archive was
  * unpacked into a folder that is too deep (or incompletely).
+ * The backend serves the interface from `frontend/dist`; without its
+ * index.html the window would only show a "not found" page.
  * 打包版启动必需的文件；sentinels 为构建时记录的最深文件，缺失通常表示解压路径过长或解压不完整。
+ * 界面由后端从 frontend/dist 提供，缺 index.html 时窗口只会显示“找不到”。
  */
 function missingBundleFiles({ resourcesPath, layout, buildInfo, existsSync }) {
   const missing = [];
   if (layout.bundledPython && !existsSync(layout.bundledPython)) missing.push(layout.bundledPython);
   const apiServer = path.join(layout.rootDir, "api_server.py");
   if (!existsSync(apiServer)) missing.push(apiServer);
+  const frontendIndex = path.join(layout.frontendDistDir, "index.html");
+  if (!existsSync(frontendIndex)) missing.push(frontendIndex);
   const sentinels = Array.isArray(buildInfo?.sentinels) ? buildInfo.sentinels : [];
   for (const relative of sentinels) {
     if (typeof relative !== "string" || !relative || relative.includes("..")) continue;
@@ -91,4 +97,35 @@ function missingBundleFiles({ resourcesPath, layout, buildInfo, existsSync }) {
   return missing;
 }
 
-module.exports = { isDistMode, resolveRuntimeLayout, distDataEnv, missingBundleFiles };
+/**
+ * One-time copy of 3MF printer templates that version 2.0.1 and earlier saved
+ * in the official app's folder (`%APPDATA%\\Lumina Studio\\3mf-templates`) into
+ * this build's own folder. Runs only while the target folder does not exist,
+ * then creates it, so it never repeats. Files are copied, never moved, and the
+ * official folder is left untouched. Returns the number of copied templates.
+ * 一次性把旧版存在官方版目录里的 3MF 模板复制到个人版目录（只复制，不删除、不改官方版目录）。
+ */
+function copyLegacy3mfTemplates({ fromDir, toDir, fs }) {
+  if (!fromDir || !toDir || path.resolve(fromDir) === path.resolve(toDir) || fs.existsSync(toDir)) return 0;
+  let names = [];
+  try {
+    names = fs.readdirSync(fromDir).filter((name) => /\.json$/i.test(name));
+  } catch (_) {
+    names = [];
+  }
+  fs.mkdirSync(toDir, { recursive: true });
+  let copied = 0;
+  for (const name of names) {
+    const source = path.join(fromDir, name);
+    try {
+      if (!fs.statSync(source).isFile()) continue;
+      fs.copyFileSync(source, path.join(toDir, name), fs.constants.COPYFILE_EXCL);
+      copied += 1;
+    } catch (_) {
+      // A template that cannot be read stays in the old folder; the rest still copy.
+    }
+  }
+  return copied;
+}
+
+module.exports = { isDistMode, resolveRuntimeLayout, distDataEnv, missingBundleFiles, copyLegacy3mfTemplates };

@@ -126,7 +126,7 @@ const WORKSHOP_RUNTIME_HEADER_NAMES = [
   "x-content-type-options",
 ];
 
-const { resolveRuntimeLayout, distDataEnv, missingBundleFiles } = require("./runtime-layout.cjs");
+const { resolveRuntimeLayout, distDataEnv, missingBundleFiles, copyLegacy3mfTemplates } = require("./runtime-layout.cjs");
 const RUNTIME_LAYOUT = resolveRuntimeLayout({
   isPackaged: app.isPackaged,
   resourcesPath: process.resourcesPath,
@@ -1260,6 +1260,18 @@ app.whenReady().then(async () => {
   for (const message of INSTALL_ACL_MESSAGES) logSys(message);
   logSys("Lumina Studio Electron starting...");
   if (scrubLegacyPlusConfig(app.getPath("userData"))) logSys("Removed legacy registry settings from plus-config.json");
+  if (DIST_MODE) {
+    try {
+      const copiedTemplates = copyLegacy3mfTemplates({
+        fromDir: path.join(app.getPath("appData"), "Lumina Studio", "3mf-templates"),
+        toDir: distDataEnv({ userData: app.getPath("userData"), env: process.env }).LUMINA_CUSTOM_3MF_TEMPLATE_DIR,
+        fs,
+      });
+      if (copiedTemplates) logSys(`Copied ${copiedTemplates} 3MF printer template(s) from the Lumina Studio folder`);
+    } catch (error) {
+      logErr(`3MF template copy skipped: ${error.message}`);
+    }
+  }
   // 让 about 面板 / app.getName() / 部分 macOS 系统提示显示正确的名字。
   app.setName("Lumina Studio 2");
   if (IS_MAC) {

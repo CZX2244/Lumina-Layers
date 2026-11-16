@@ -426,6 +426,7 @@ test("dist desktop serves the built frontend from the backend without Node or Vi
   assert.equal(backendEnv.LUMINA_FRONTEND_DIST_DIR, path.join(path.dirname(mainPath), "..", "frontend", "dist"));
   assert.equal(backendEnv.LUMINA_SETTINGS_PATH, path.join(f.root, "user_settings.json"));
   assert.equal(backendEnv.LUMINA_OUTPUT_DIR, path.join(f.root, "output"));
+  assert.equal(backendEnv.LUMINA_CUSTOM_3MF_TEMPLATE_DIR, path.join(f.root, "3mf-templates"));
   assert.equal(backendEnv.LUMINA_FEEDBACK_SERVER_URL, "off");
   assert.deepEqual(f.portChecks, [], "the Vite port is not required in dist mode");
   await f.healthy();
@@ -446,10 +447,26 @@ test("dist desktop keeps data locations the user configured but forces network f
   assert.equal(backendEnv.LUMINA_OUTPUT_DIR, "D:\\Lumina\\out");
 });
 
-function packagedResources(t, buildInfo) {
+test("dist desktop copies 3MF templates an older build saved in the Lumina Studio folder", async t => {
+  // The fixture answers every app.getPath() with the same folder, so the
+  // official folder is <root>/Lumina Studio and this build's folder is <root>.
+  const legacy = id => path.join("Lumina Studio", "3mf-templates", `${id}.json`);
+  const f = await fixture(t, "win32", "healthy", root => {
+    fs.mkdirSync(path.join(root, "Lumina Studio", "3mf-templates"), { recursive: true });
+    fs.writeFileSync(path.join(root, legacy("a1")), "{\"name\":\"A1 template\"}");
+  }, { env: { LUMINA_ELECTRON_FRONTEND: "dist" } });
+  assert.equal(fs.readFileSync(path.join(f.root, "3mf-templates", "a1.json"), "utf8"), "{\"name\":\"A1 template\"}");
+  assert.ok(fs.existsSync(path.join(f.root, legacy("a1"))), "the official folder keeps its copy");
+});
+
+function packagedResources(t, buildInfo, { frontend = true } = {}) {
   const resourcesPath = fs.mkdtempSync(path.join(os.tmpdir(), "lumina-packaged-resources-"));
   fs.mkdirSync(path.join(resourcesPath, "app"), { recursive: true });
   fs.writeFileSync(path.join(resourcesPath, "app", "api_server.py"), "");
+  if (frontend) {
+    fs.mkdirSync(path.join(resourcesPath, "app", "frontend", "dist"), { recursive: true });
+    fs.writeFileSync(path.join(resourcesPath, "app", "frontend", "dist", "index.html"), "<!doctype html>");
+  }
   if (buildInfo) fs.writeFileSync(path.join(resourcesPath, "app", "BUILD_INFO.json"), "\uFEFF" + JSON.stringify(buildInfo));
   t.after(() => fs.rmSync(resourcesPath, { recursive: true, force: true }));
   return resourcesPath;
@@ -466,6 +483,17 @@ test("packaged desktop refuses to start when deep bundled files are missing", as
   assert.match(f.errors[0][1], /260/);
   assert.match(String(f.errors[0][2]), /打开日志文件夹|Open log folder/);
   assert.match(f.errors[0][1], /lumina-electron\.log/);
+});
+
+test("packaged desktop refuses to start without the built interface", async t => {
+  const resourcesPath = packagedResources(t, undefined, { frontend: false });
+  const python = path.join(resourcesPath, "py", "python.exe");
+  const f = await fixture(t, "win32", "healthy", undefined, { isPackaged: true, resourcesPath, pythonPaths: [python] });
+  await until(() => f.app.quitted);
+  assert.equal(f.children.length, 0, "the backend is not started");
+  assert.equal(f.errors.length, 1);
+  assert.match(f.errors[0][1], /frontend[\\/]dist[\\/]index\.html/);
+  assert.match(f.errors[0][1], /程序文件不完整|program files are incomplete/);
 });
 
 test("packaged desktop starts when every recorded bundled file exists", async t => {

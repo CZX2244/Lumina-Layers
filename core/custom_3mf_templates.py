@@ -12,7 +12,17 @@ from uuid import UUID, uuid4
 import zipfile
 
 
+CUSTOM_3MF_TEMPLATE_DIR_ENV = "LUMINA_CUSTOM_3MF_TEMPLATE_DIR"
+
+
 def _root() -> Path:
+    """Template folder: ``LUMINA_CUSTOM_3MF_TEMPLATE_DIR`` when set (desktop
+    builds point it at their own data folder), else the shared desktop folder.
+    模板目录：设置了环境变量时用它（桌面版指向自己的数据目录），否则用默认桌面目录。
+    """
+    override = os.environ.get(CUSTOM_3MF_TEMPLATE_DIR_ENV, "").strip()
+    if override:
+        return Path(override)
     from config import _desktop_user_data_dir
 
     return Path(_desktop_user_data_dir()) / "3mf-templates"

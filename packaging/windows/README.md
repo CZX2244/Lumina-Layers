@@ -25,6 +25,8 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
 
 设置、耗材档案、自定义 LUT、缓存、日志和输出都在
 `%APPDATA%\Lumina Studio Plus\`，重装或升级不会丢失。
+2.0.1 及更早的版本把 3MF 打印机模板误存到官方版的 `%APPDATA%\Lumina Studio\3mf-templates`；
+2.0.2 起存到 `%APPDATA%\Lumina Studio Plus\3mf-templates`，首次启动时会把旧模板复制过来（只复制，官方版目录不动）。
 
 ## 离线与隐私
 
