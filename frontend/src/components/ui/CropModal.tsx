@@ -301,6 +301,10 @@ export function CropModal({
             src={imageSrc}
             style={{ height: "100%", maxHeight: "50vh", width: "100%" }}
             viewMode={1}
+            // Browsers already show EXIF-rotated photos upright and the backend
+            // crops those upright pixels; letting cropperjs rotate again would
+            // mix up the coordinates (and the manual rotate buttons).
+            checkOrientation={false}
             dragMode={allowCrop ? "crop" : "move"}
             autoCrop={allowCrop}
             autoCropArea={1}

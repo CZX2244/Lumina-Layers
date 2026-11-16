@@ -14,9 +14,12 @@ const cropper = vi.hoisted(() => ({
   setData: vi.fn(),
 }));
 
+const cropperProps: { last: Record<string, unknown> | null } = { last: null };
+
 vi.mock("react-cropper", async () => {
   const { forwardRef, useImperativeHandle } = await import("react");
-  return { default: forwardRef(function MockCropper(_, ref) {
+  return { default: forwardRef(function MockCropper(props: Record<string, unknown>, ref) {
+    cropperProps.last = props;
     useImperativeHandle(ref, () => ({ cropper }));
     return <div data-testid="cropper-surface" />;
   }) };
@@ -24,6 +27,11 @@ vi.mock("react-cropper", async () => {
 
 describe("CropModal rotation drafts", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("works on the upright picture the browser shows instead of re-reading EXIF rotation", () => {
+    render(<CropModal open imageSrc="blob:test" onConfirm={vi.fn()} onClose={vi.fn()} onUseOriginal={vi.fn()} />);
+    expect(cropperProps.last?.checkOrientation).toBe(false);
+  });
 
   it("zooms smoothly around the pointer and prevents page scrolling", () => {
     render(<CropModal open imageSrc="blob:test" onConfirm={vi.fn()} onClose={vi.fn()} onUseOriginal={vi.fn()} />);

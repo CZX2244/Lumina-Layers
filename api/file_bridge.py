@@ -229,6 +229,49 @@ async def upload_to_tempfile(
     return path
 
 
+_EXIF_ORIENTATION_TAG = 0x0112
+_ORIENTABLE_IMAGE_EXTENSIONS: frozenset[str] = frozenset(
+    {".jpg", ".jpeg", ".jfif", ".png", ".tif", ".tiff", ".webp"}
+)
+
+
+def _upright_passthrough_upload(raw_path: str) -> str:
+    """Rewrite an EXIF-rotated upload as an upright PNG; otherwise keep it.
+
+    Browsers show photos upright (EXIF orientation), and crop boxes are drawn
+    on that upright view, so the backend must work in the same space. Files
+    without a rotation tag are returned untouched (no re-encoding).
+    按 EXIF 方向把带旋转标记的上传图摆正并另存为 PNG；没有旋转标记的文件原样返回。
+    """
+    try:
+        with Image.open(raw_path) as img:
+            orientation = img.getexif().get(_EXIF_ORIENTATION_TAG, 1)
+            if orientation not in range(2, 9) or getattr(img, "n_frames", 1) > 1:
+                return raw_path
+            upright = _normalize_pil_orientation(img)
+            has_alpha = upright.mode in ("RGBA", "LA", "PA") or (
+                upright.mode == "P" and "transparency" in upright.info
+            )
+            upright = upright.convert("RGBA" if has_alpha else "RGB")
+    except (UnidentifiedImageError, OSError, ValueError):
+        # Unreadable files keep their original path; later validation reports them.
+        return raw_path
+
+    from config import TEMP_DIR
+
+    fd, png_path = tempfile.mkstemp(suffix=".png", dir=TEMP_DIR)
+    os.close(fd)
+    try:
+        upright.save(png_path, "PNG")
+    except OSError:
+        with suppress(OSError):
+            os.unlink(png_path)
+        return raw_path
+    with suppress(OSError):
+        os.unlink(raw_path)
+    return png_path
+
+
 async def ensure_png_tempfile(file: UploadFile) -> str:
     """Validate and save uploaded image to temp; convert HEIC/HEIF/RAW to PNG.
     校验并保存上传图片为临时文件；若为 HEIC/HEIF/RAW 则转换为 PNG。
@@ -250,6 +293,8 @@ async def ensure_png_tempfile(file: UploadFile) -> str:
     raw_path = await upload_to_tempfile(file)
 
     if ext not in HEIC_EXTENSIONS and ext not in RAW_EXTENSIONS:
+        if ext in _ORIENTABLE_IMAGE_EXTENSIONS:
+            return _upright_passthrough_upload(raw_path)
         return raw_path
 
     if ext in HEIC_EXTENSIONS and not HAS_HEIF:
