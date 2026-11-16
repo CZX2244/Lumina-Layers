@@ -9,7 +9,7 @@
   “Lumina Studio Plus (Windows desktop)” 会生成两个产物：
   - `LuminaPlus-installer`：安装程序（装到当前用户目录，无需管理员权限）——推荐
   - `LuminaPlus-portable`：免安装 zip，解压后运行 `Lumina Studio Plus.exe`
-- 推送形如 `plus-v2.0.1-1` 的标签时，同时发布到本仓库的 Releases 页。
+- 推送形如 `plus-v2.0.2-1` 的标签时，同时发布到本仓库的 Releases 页。
 
 ## 在自己电脑上构建
 
@@ -58,3 +58,14 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
   - 这只增加读取/执行权限，不修改程序文件，也不动其它软件加的权限项。
 - **打不开或启动失败**：弹窗会写明原因并可打开日志文件夹；日志在
   `%APPDATA%\Lumina Studio Plus\logs\lumina-electron.log`，后端的错误输出也记录在里面。
+
+## 更新记录
+
+- **2.0.2**
+  - 只靠本地：去掉创意工坊；后端的耗材库、LUT 库、问题报告上传、数据库地址一律关闭。
+  - 带旋转信息的手机照片裁切后不再丢画面。
+  - 普通图片出图自动去掉四周透明边，设 60 mm 就是 60 mm；可以一键恢复原图。模型贴图不受影响。
+  - 大画幅模板长边 400 mm；拼图装配参考图的编号与导出的 3MF 一致。
+  - 下载文件名不再带 `tmpXXXXXXXX_` 前缀；拼图和大画幅压缩包按原图命名。
+  - 3MF 打印机模板存到个人版数据目录；缺少界面文件时启动会提示。
+  - 全新启动不再显示「有未保存的修改」。
