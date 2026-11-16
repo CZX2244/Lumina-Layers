@@ -20,7 +20,9 @@ from core.naming import (
     generate_preserved_upload_3mf_filename,
     generate_preview_filename,
     generate_segmented_glb_filename,
+    generate_source_download_filename,
     parse_filename,
+    public_model_filename,
 )
 
 # Timestamp pattern used across tests
@@ -415,3 +417,41 @@ class TestGenerateSegmentedGlbFilename:
         name = generate_segmented_glb_filename("sess0001", extension=".gltf")
         assert name.endswith(".gltf")
         assert not name.endswith(".glb")
+
+
+class TestDownloadNamesWithoutTempStems:
+    """Uploads are stored as tmpXXXXXXXX files; downloads must not expose that stem."""
+
+    def test_generated_model_name_drops_the_temp_upload_stem(self):
+        assert public_model_filename("tmpeu8tm5re_Lumina_HiFi_4C_20261116_101500.3mf") == (
+            "Lumina_HiFi_4C_20261116_101500.3mf"
+        )
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "Lumina_HiFi_4C_20261116_101500.3mf",
+            "cat_Lumina_HiFi_4C_20261116_101500.3mf",
+            "tmpfolder_photo.3mf",  # not followed by a generated Lumina name
+            "tmpabc_Lumina_HiFi_4C_20261116_101500.3mf",  # too short for a tempfile stem
+        ],
+    )
+    def test_other_names_are_unchanged(self, name):
+        assert public_model_filename(name) == name
+
+    def test_combined_download_uses_the_source_name(self):
+        assert generate_source_download_filename("猫 logo", "puzzle", ".3mf") == "猫 logo_puzzle.3mf"
+        assert generate_source_download_filename("a:b", "large_format", ".zip") == "a_b_large_format.zip"
+
+    @pytest.mark.parametrize("source", [None, "", "  ", "tmpeu8tm5re"])
+    def test_combined_download_without_a_real_source_name(self, source):
+        assert generate_source_download_filename(source, "puzzle", ".3mf") == "Lumina_puzzle.3mf"
+
+    def test_combined_download_fits_one_path_component(self):
+        name = generate_source_download_filename("海" * 200, "large_format", ".zip")
+        assert name.endswith("_large_format.zip")
+        assert len(name.encode("utf-8")) <= 255
+
+    def test_preserved_upload_name_ignores_a_bare_temp_stem(self):
+        assert generate_preserved_upload_3mf_filename("tmpeu8tm5re") is None
+        assert generate_preserved_upload_3mf_filename("海报.final") == "海报.final.3mf"

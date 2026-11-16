@@ -19,6 +19,7 @@ from concurrent.futures.process import BrokenProcessPool
 import inspect
 import json
 import os
+import shutil
 import pickle
 import tempfile
 import zipfile
@@ -2401,6 +2402,36 @@ class TestGenerateParameterCompleteness:
         assert entry is not None
         assert entry["filename"] == os.path.basename(worker_path)
 
+    def test_generated_download_drops_the_temp_upload_stem_and_survives_session_close(self) -> None:
+        """Uploads live under tempfile names; the download must not start with tmpXXXXXXXX_."""
+        out_dir = tempfile.mkdtemp()
+        out_path = os.path.join(out_dir, "tmpeu8tm5re_Lumina_Vector_4C_20261116_101500.3mf")
+        with open(out_path, "wb") as handle:
+            handle.write(b"3mf payload")
+        sid: str = _create_session_with_preview_and_files(_test_store)
+        _mock_pool.submit = AsyncMock(
+            return_value={"threemf_path": out_path, "glb_path": None, "status_msg": "OK"}
+        )
+        try:
+            with patch("os.path.exists", return_value=True):  # the session's source files are placeholders
+                response = client.post(
+                    "/api/convert/generate",
+                    json={"session_id": sid, "params": {"lut_name": "test_lut"}},
+                )
+            assert response.status_code == 200, response.text
+            download_url = response.json()["download_url"]
+            entry = _test_registry.get_entry(download_url.rsplit("/", 1)[-1])
+            assert entry is not None
+            assert entry["filename"] == "Lumina_Vector_4C_20261116_101500.3mf"
+
+            assert client.post("/api/session/close", json={"session_id": sid}).status_code == 200
+            download = client.get(download_url)
+            assert download.status_code == 200
+            assert download.content == b"3mf payload"
+            assert download.headers["content-disposition"] == 'attachment; filename="Lumina_Vector_4C_20261116_101500.3mf"'
+        finally:
+            shutil.rmtree(out_dir, ignore_errors=True)
+
     def test_preserve_upload_filename_requires_strict_boolean(self) -> None:
         sid: str = _create_session_with_preview_and_files(_test_store)
         _mock_pool.submit.reset_mock()
@@ -3816,6 +3847,70 @@ class TestGenerateRegistryFailureCleanup:
         assert exc_info.value.detail == LARGE_FORMAT_GENERATION_FAILED_DETAIL
         assert "registry unavailable" not in str(exc_info.value.detail)
         assert not (tmp_path / "tile.3mf").exists()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("native_svg", [False, True])
+    async def test_large_format_zip_is_named_after_the_source_and_outlives_the_session(
+        self,
+        tmp_path,
+        native_svg: bool,
+    ) -> None:
+        image_path = tmp_path / ("source.svg" if native_svg else "source.png")
+        lut_path = tmp_path / "source.npy"
+        if native_svg:
+            image_path.write_text("<svg/>", encoding="utf-8")
+        else:
+            Image.fromarray(np.zeros((20, 20, 3), dtype=np.uint8)).save(image_path)
+        lut_path.write_bytes(b"lut")
+        worker_zip = tmp_path / "tmpk2l9q0zz.zip"
+        worker_zip.write_bytes(b"zip")
+
+        async def _write_tile(*_args, **_kwargs):
+            if native_svg:
+                return {"zip_path": str(worker_zip), "tile_count": 1, "grid_cols": 1, "grid_rows": 1, "warnings": []}
+            tile_path = tmp_path / "tile.3mf"
+            tile_path.write_bytes(b"3mf")
+            return {"threemf_path": str(tile_path), "status_msg": "OK"}
+
+        mock_pool = MagicMock(spec=WorkerPoolManager)
+        mock_pool.submit = AsyncMock(side_effect=_write_tile)
+        request = LargeFormatConvertGenerateRequest(
+            total_width_mm=20.0,
+            total_height_mm=20.0,
+            tile_width_mm=20.0,
+            tile_height_mm=20.0,
+            lut_name="test_lut",
+            modeling_mode=ModelingMode.HIGH_FIDELITY,
+        )
+        sid = _test_store.create()
+        generate = _generate_large_format_svg_native if native_svg else _generate_large_format_raster
+        result = await generate(
+            image_path=str(image_path),
+            lut_path=str(lut_path),
+            source_basename="海报",
+            recipe_overrides=None,
+            recipe_override_masks_path=None,
+            material_matrix_path=None,
+            total_width_mm=20.0,
+            total_height_mm=20.0,
+            tile_width_mm=20.0,
+            tile_height_mm=20.0,
+            request=request,
+            session_data={},
+            sid=sid,
+            store=_test_store,
+            registry=_test_registry,
+            pool=mock_pool,
+            warnings=[],
+        )
+
+        download_url = result["download_url"]
+        _test_store.close(sid)
+        download = client.get(download_url)
+        assert download.status_code == 200
+        assert download.headers["content-disposition"] == (
+            "attachment; filename*=utf-8''%E6%B5%B7%E6%8A%A5_large_format.zip"
+        )
 
     @pytest.mark.asyncio
     async def test_large_format_raster_broken_pool_stops_remaining_tiles(

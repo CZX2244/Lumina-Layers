@@ -80,7 +80,11 @@ from core.errors import (
 )
 from .export_materials import require_material_selection
 from core.model_surface.types import ModelSurfaceError
-from core.naming import generate_preserved_upload_3mf_filename
+from core.naming import (
+    generate_preserved_upload_3mf_filename,
+    generate_source_download_filename,
+    public_model_filename,
+)
 from core.preview_analysis_cache import REQUIRED_PREVIEW_ANALYSIS_REUSE
 from core.wipe_tower_placement import WIPE_TOWER_MANUAL_WARNING_CODE
 from utils.merged_bambu_3mf_writer import (
@@ -2719,6 +2723,8 @@ async def convert_generate(
                     session_data.get("source_basename")
                 )
                 download_filename = str(Path(download_filename).with_suffix(Path(threemf_path).suffix))
+            if download_filename is None:
+                download_filename = public_model_filename(Path(threemf_path).name)
             embed_generated_project(threemf_path, request.project_revision_file_id, registry)
             download_id = registry.register_path(
                 str(uuid.uuid4()),
@@ -3196,6 +3202,7 @@ async def _generate_large_format_svg_native(
             download_id = registry.register_path(
                 str(uuid.uuid4()),
                 zip_path,
+                filename=generate_source_download_filename(source_basename, "large_format", ".zip"),
                 ttl_seconds=BATCH_DOWNLOAD_TTL_SECONDS,
             )
         except ROUTER_HANDLED_ERRORS as exc:
@@ -3883,6 +3890,7 @@ async def _generate_large_format_raster(
             download_id = registry.register_path(
                 str(uuid.uuid4()),
                 zip_path,
+                filename=generate_source_download_filename(source_basename, "large_format", ".zip"),
                 ttl_seconds=BATCH_DOWNLOAD_TTL_SECONDS,
             )
         except ROUTER_HANDLED_ERRORS as exc:

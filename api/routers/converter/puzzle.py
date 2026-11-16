@@ -54,6 +54,7 @@ from config import ModelingMode as CoreModelingMode
 from config import TEMP_DIR
 from core.errors import ExternalSpoolSelectionError, NativeMaterialSelectionError, WipeTowerLayoutError
 from core.preview_analysis_cache import REQUIRED_PREVIEW_ANALYSIS_REUSE
+from core.naming import generate_source_download_filename
 from .export_materials import require_material_selection
 from core.puzzle import (
     PuzzleLayout,
@@ -1080,7 +1081,7 @@ async def generate_puzzle(
     warnings = list(layout.warnings)
 
     sid = body.session_id
-    base_name = os.path.splitext(os.path.basename(image_path))[0] or "puzzle"
+    download_filename = generate_source_download_filename(session_data.get("source_basename"), "puzzle", ".3mf")
     selected_materials = (
         list(session_data.get("selected_materials") or [])
         if session_material_source == "material_archive"
@@ -1521,7 +1522,7 @@ async def generate_puzzle(
         download_id = registry.register_path(
             str(uuid.uuid4()),
             combined_3mf_path,
-            filename=f"{base_name}_puzzle.3mf",
+            filename=download_filename,
             ttl_seconds=BATCH_DOWNLOAD_TTL_SECONDS,
         )
         combined_registered = True

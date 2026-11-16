@@ -67,6 +67,13 @@ _MAX_PRESERVED_3MF_STEM_BYTES = (
 )
 
 
+# Python tempfile names: "tmp" + 8 characters from [a-z0-9_]. Uploads are
+# stored under such names, so a generated model inherits e.g.
+# "tmpeu8tm5re_Lumina_HiFi_4C_….3mf" when no source name is kept.
+_PYTHON_TEMP_STEM_RE = re.compile(r"^tmp[a-z0-9_]{8}$")
+_PYTHON_TEMP_MODEL_PREFIX_RE = re.compile(r"^tmp[a-z0-9_]{8}_(?=Lumina_)")
+
+
 def _strip_temp_prefix(name: str) -> str:
     """去除上传器/pywebview 生成的临时文件名前缀。"""
     return _TEMP_PREFIX_RE.sub("", name)
@@ -95,21 +102,50 @@ def generate_preserved_upload_3mf_filename(
         A safe ``.3mf`` filename, or ``None`` when no usable stem remains.
         安全的 ``.3mf`` 文件名；无法得到有效名称时返回 ``None``。
     """
+    stem = _safe_source_stem(source_basename, _MAX_PRESERVED_3MF_STEM_BYTES)
+    return f"{stem}{_PRESERVED_3MF_EXTENSION}" if stem else None
+
+
+def _safe_source_stem(source_basename: str | None, max_bytes: int) -> str:
+    """Return a filesystem-safe stem from an upload name, or "" when none is usable.
+
+    Temporary-file names ("tmpXXXXXXXX") are not real source names and give "".
+    从上传文件名得到安全的文件名主体；临时文件名视为没有名字。
+    """
     stem = str(source_basename or "").strip()
-    if not stem:
-        return None
+    if not stem or _PYTHON_TEMP_STEM_RE.match(stem):
+        return ""
     stem = _strip_temp_prefix(stem)
     stem = _CONTROL_CHAR_RE.sub("_", stem)
     stem = _sanitize(stem).strip(" .")
-    stem = _truncate_utf8(stem, _MAX_PRESERVED_3MF_STEM_BYTES).rstrip(" .")
-    if not stem:
-        return None
-    if _WINDOWS_RESERVED_NAME_RE.match(stem):
-        stem = _truncate_utf8(
-            f"_{stem}",
-            _MAX_PRESERVED_3MF_STEM_BYTES,
-        ).rstrip(" .")
-    return f"{stem}{_PRESERVED_3MF_EXTENSION}"
+    stem = _truncate_utf8(stem, max_bytes).rstrip(" .")
+    if stem and _WINDOWS_RESERVED_NAME_RE.match(stem):
+        stem = _truncate_utf8(f"_{stem}", max_bytes).rstrip(" .")
+    return stem
+
+
+def generate_source_download_filename(source_basename: str | None, tag: str, extension: str) -> str:
+    """Name a combined download after its source image: ``<source>_<tag><ext>``.
+
+    Falls back to ``Lumina_<tag><ext>`` when the source name is missing or is
+    only a temporary-file name.
+    按原图名命名合并下载（如 ``猫_puzzle.3mf``），没有原图名时用 ``Lumina_<tag>``。
+    """
+    suffix = f"_{tag}{extension}"
+    stem = _safe_source_stem(
+        source_basename, _MAX_FILENAME_COMPONENT_BYTES - len(suffix.encode("utf-8"))
+    )
+    return f"{stem or 'Lumina'}{suffix}"
+
+
+def public_model_filename(filename: str) -> str:
+    """Drop the random temporary-file stem a generated model name inherited.
+
+    ``tmpeu8tm5re_Lumina_HiFi_4C_20261116_101500.3mf`` → ``Lumina_HiFi_4C_20261116_101500.3mf``;
+    other names are returned unchanged.
+    去掉生成文件名从临时上传文件继承来的随机前缀。
+    """
+    return _PYTHON_TEMP_MODEL_PREFIX_RE.sub("", filename, count=1)
 
 
 def generate_model_filename(

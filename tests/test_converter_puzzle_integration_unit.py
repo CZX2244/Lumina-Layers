@@ -677,6 +677,47 @@ class TestGeneratePuzzleCanary:
         ]) == 2
 
 
+@pytest.mark.parametrize(
+    ("source_basename", "expected"),
+    [("猫 logo", "猫 logo_puzzle.3mf"), (None, "Lumina_puzzle.3mf")],
+)
+def test_puzzle_download_is_named_after_the_source_and_outlives_the_session(
+    puzzle_harness, tmp_path, source_basename, expected,
+) -> None:
+    """The combined 3MF uses the original upload name, never the tmpXXXXXXXX image path."""
+    store: SessionStore = puzzle_harness["store"]
+    session_id = _seed_puzzle_generate_session(store, tmp_path)
+    temp_named_image = tmp_path / "tmpeu8tm5re.png"
+    Path(store.get(session_id)["image_path"]).rename(temp_named_image)
+    store.put(session_id, "image_path", str(temp_named_image))
+    if source_basename is not None:
+        store.put(session_id, "source_basename", source_basename)
+    pieces = iter(range(1, 100))
+
+    async def _submit_stub(*_args, **_kwargs) -> dict[str, object]:
+        path = tmp_path / f"piece-{next(pieces)}.3mf"
+        path.write_bytes(b"piece-3mf")
+        return {"threemf_path": str(path), "glb_path": None, "status_msg": "ok", "x_mirrored": False, "mirror_span_mm": 1.0}
+
+    def _assemble_stub(*, output_path: str, **_kwargs) -> str:
+        Path(output_path).write_bytes(b"combined-3mf")
+        return output_path
+
+    puzzle_harness["pool"].submit = AsyncMock(side_effect=_submit_stub)
+    with patch("api.routers.converter.puzzle.assemble_puzzle_3mf", side_effect=_assemble_stub):
+        response = puzzle_harness["client"].post("/api/convert/generate-puzzle", json=_generate_puzzle_body(session_id))
+
+    assert response.status_code == 200, response.text
+    file_id = response.json()["download_url"].rsplit("/", 1)[-1]
+    registry: FileRegistry = puzzle_harness["registry"]
+    assert registry.get_entry(file_id)["filename"] == expected
+
+    store.close(session_id)
+    path, filename = registry.resolve(file_id)
+    assert filename == expected
+    assert Path(path).read_bytes() == b"combined-3mf"
+
+
 @pytest.mark.parametrize("source", ["lut", "material_archive", "dynamic_material"])
 def test_generate_puzzle_runs_bounded_parallel_pieces_in_layout_order(
     puzzle_harness, tmp_path, source: str,
