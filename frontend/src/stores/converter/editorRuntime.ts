@@ -11,7 +11,7 @@ export const EDITOR_RUNTIME_KEYS = [
   "preview_width_mm", "preview_height_mm", "preview_spacer_thick", "previewPixelWidth", "previewPixelHeight", "modelBounds",
   "hasManualPreview", "previewAutoRefreshPending", "lutMatchMode", "lutMatchInfo", "previewWarnings",
   "layerImages", "layerImagesSourceKey", "gradientGroups", "gradientGroupsSessionId",
-  "puzzleOverlayUrl", "puzzleWarnings", "puzzleResolvedRows", "puzzleResolvedCols", "puzzleResolvedPieceCount", "puzzleDerivedPieceWidthMm", "puzzleDerivedPieceHeightMm",
+  "puzzleOverlayUrl", "puzzleWarnings", "puzzleResolvedRows", "puzzleResolvedCols", "puzzleResolvedPieceCount", "puzzlePieces", "puzzleDerivedPieceWidthMm", "puzzleDerivedPieceHeightMm",
 ] as const satisfies readonly (keyof ConverterState)[];
 
 export type EditorRuntime = Pick<ConverterState, typeof EDITOR_RUNTIME_KEYS[number]>;

@@ -4128,6 +4128,7 @@ export const useConverterStore = create<ConverterState & ConverterActions>()(
           puzzleResolvedRows: response.grid_rows,
           puzzleResolvedCols: response.grid_cols,
           puzzleResolvedPieceCount: response.piece_count,
+          puzzlePieces: response.pieces?.length ? response.pieces : null,
           puzzleDerivedPieceWidthMm: response.derived_piece_width_mm,
           puzzleDerivedPieceHeightMm: response.derived_piece_height_mm,
           error: null,

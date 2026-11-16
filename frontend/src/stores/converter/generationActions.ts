@@ -254,6 +254,7 @@ export function createGenerationActions(
       puzzleResolvedRows: null,
       puzzleResolvedCols: null,
       puzzleResolvedPieceCount: null,
+      puzzlePieces: null,
       largeFormatWarnings: [],
       largeFormatFailedTiles: [],
       ...(preservePreviews
@@ -699,6 +700,7 @@ export function createGenerationActions(
             puzzleResolvedRows: puzzleResponse.grid_rows ?? null,
             puzzleResolvedCols: puzzleResponse.grid_cols ?? null,
             puzzleResolvedPieceCount: puzzleResponse.piece_count ?? null,
+            puzzlePieces: puzzleResponse.pieces?.length ? puzzleResponse.pieces : null,
           });
           _logGenerateTimer("puzzle 3mf received");
           _clientLog("generate: puzzle 3mf received", {

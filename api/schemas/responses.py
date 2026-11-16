@@ -987,6 +987,16 @@ class RecipePredictionResponse(BaseModel):
     runtime_mode_key: Optional[str] = None
 
 
+class PuzzlePieceSummary(BaseModel):
+    """One puzzle piece as exported: label plus top-left-origin geometry in mm.
+    导出时的一块拼图：编号与毫米坐标（左上角为原点）。
+    """
+
+    label: str
+    bbox_mm: tuple[float, float, float, float]
+    centroid_mm: tuple[float, float]
+
+
 class PuzzleLayoutPreviewResponse(BaseModel):
     """拼图布局预览响应。"""
 
@@ -1000,6 +1010,7 @@ class PuzzleLayoutPreviewResponse(BaseModel):
     derived_piece_height_mm: float | None = None
     warnings: list[str] = Field(default_factory=list)
     piece_areas_mm2: list[float] = Field(default_factory=list)
+    pieces: list[PuzzlePieceSummary] = Field(default_factory=list)
 
 
 class PuzzleGenerateResponse(_NoPublic3mfDiskPathMixin):
@@ -1013,6 +1024,7 @@ class PuzzleGenerateResponse(_NoPublic3mfDiskPathMixin):
     grid_cols: int
     grid_rows: int
     warnings: list[str] = Field(default_factory=list)
+    pieces: list[PuzzlePieceSummary] = Field(default_factory=list)
     editor_content_revision: int | None = None
     selection_revision: int | None = None
 

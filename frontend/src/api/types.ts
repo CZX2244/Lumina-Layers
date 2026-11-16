@@ -250,6 +250,14 @@ export interface PuzzleLayoutPreviewRequest {
   min_neck_width_mm: number;
 }
 
+/** One puzzle piece as laid out by the backend; preview and export use the same layout. */
+export interface PuzzlePieceSummary {
+  label: string;
+  /** (x0, y0, x1, y1) in mm, image coordinates (y grows downward). */
+  bbox_mm: [number, number, number, number];
+  centroid_mm: [number, number];
+}
+
 export interface PuzzleLayoutPreviewResponse {
   status: string;
   message?: string;
@@ -260,6 +268,8 @@ export interface PuzzleLayoutPreviewResponse {
   derived_piece_width_mm: number;
   derived_piece_height_mm: number;
   warnings: string[];
+  /** Missing from older backends. */
+  pieces?: PuzzlePieceSummary[];
 }
 
 export interface PuzzleGenerateRequest extends PuzzleLayoutPreviewRequest {
@@ -275,6 +285,8 @@ export interface PuzzleGenerateResponse {
   grid_cols: number;
   grid_rows: number;
   warnings: string[];
+  /** Missing from older backends. */
+  pieces?: PuzzlePieceSummary[];
   editor_content_revision?: number | null;
   selection_revision?: number | null;
 }

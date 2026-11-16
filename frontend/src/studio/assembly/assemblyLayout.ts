@@ -7,12 +7,13 @@
  * row and the last column/row keeps the remainder. Each tile is exported as
  * `<image name>_R{row}C{col}.3mf` inside the ZIP (core/vector_large_format.py
  * `format_large_format_tile_label`); the sheet keys tiles by that stable
- * `R{row}C{col}` suffix and marks tiles the backend reported as not generated. Puzzle labels mirror
- * `core/puzzle.py::_format_piece_label` (row letters, column number: A1, B3,
- * AA12) used for the exported `puzzle_{label}_…` objects.
+ * `R{row}C{col}` suffix and marks tiles the backend reported as not generated. Puzzle pieces
+ * come straight from the backend layout (`pieces` in the preview/generate
+ * responses), whose labels name the exported `puzzle_{label}_…` objects.
  * 大画幅复用与后端一致的切分（左上角起按行切、末行末列留余量，ZIP 内 R{行}C{列}.3mf）；
- * 拼图编号与后端一致（行字母 + 列数字，导出对象 puzzle_{编号}_…）。
+ * 拼图块直接用后端返回的布局（编号即导出对象 puzzle_{编号}_…）。
  */
+import type { PuzzlePieceSummary } from "../../api/types";
 import { formatLargeFormatTileLabel, resolveLargeFormatTileGrid } from "../../utils/largeFormatTileLayout";
 
 export interface AssemblyCell {
@@ -28,6 +29,9 @@ export interface AssemblyCell {
   heightMm: number;
   /** The backend reported this part as not generated (e.g. an empty tile). */
   missing?: boolean;
+  /** Where to draw the label (piece centroid); defaults to the cell centre. */
+  labelXMm?: number;
+  labelYMm?: number;
 }
 
 export interface AssemblyLayout {
@@ -40,18 +44,6 @@ export interface AssemblyLayout {
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
-
-/** Mirrors core/puzzle.py `_format_piece_label` (zero-based indices). */
-export function formatPuzzlePieceLabel(rowIndex: number, colIndex: number): string {
-  let value = rowIndex + 1;
-  const letters: string[] = [];
-  while (value > 0) {
-    const remainder = (value - 1) % 26;
-    value = Math.floor((value - 1) / 26);
-    letters.push(String.fromCharCode(65 + remainder));
-  }
-  return `${letters.reverse().join("")}${colIndex + 1}`;
-}
 
 export function largeFormatAssembly(input: {
   widthMm: number;
@@ -83,27 +75,49 @@ export function largeFormatAssembly(input: {
   return { kind: "large-format", totalWidthMm: round2(input.widthMm), totalHeightMm: round2(input.heightMm), rows: grid.rows, cols: grid.cols, cells };
 }
 
+/** Row/column of a backend label such as `B3` or `AA12` (1-based); null when malformed. */
+export function parsePuzzlePieceLabel(label: string): { row: number; col: number } | null {
+  const match = /^([A-Z]+)(\d+)$/.exec(label);
+  if (!match) return null;
+  const row = Array.from(match[1]).reduce((value, char) => value * 26 + (char.charCodeAt(0) - 64), 0);
+  return { row, col: Number(match[2]) };
+}
+
 /**
- * Puzzle grid as resolved by the backend layout preview (rows/cols). Cells
- * give the nominal position used to place each label; irregular cut lines
- * come from the backend overlay image, drawn on top by the renderer.
- * 拼图网格取后端布局预览的行列；格子用于放置编号，异形切线由后端叠加图提供。
+ * Puzzle pieces exactly as the backend laid them out (preview, then the
+ * generated result). Transparent cells drop out of the layout, so the sheet
+ * must not assume a full rows × cols grid: numbering, positions and the list
+ * all come from the reported pieces. Irregular cut lines come from the backend
+ * overlay image, drawn on top by the renderer.
+ * 拼图块直接取后端布局（预览结果，导出后用导出结果）；透明格子不成块，
+ * 所以编号、位置和清单都按实际块，不按满格网格。
  */
-export function puzzleAssembly(input: { widthMm: number; heightMm: number; rows: number; cols: number }): AssemblyLayout | null {
-  const { widthMm, heightMm, rows, cols } = input;
-  if (!(widthMm > 0 && heightMm > 0 && Number.isInteger(rows) && Number.isInteger(cols) && rows > 0 && cols > 0)) return null;
-  const pieceW = widthMm / cols;
-  const pieceH = heightMm / rows;
-  const cells: AssemblyCell[] = [];
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
-      const label = formatPuzzlePieceLabel(row, col);
-      cells.push({
-        label, exportName: `puzzle_${label}`, row: row + 1, col: col + 1,
-        xMm: round2(col * pieceW), yMm: round2(row * pieceH), widthMm: round2(pieceW), heightMm: round2(pieceH),
-      });
-    }
-  }
+export function puzzleAssembly(input: {
+  widthMm: number;
+  heightMm: number;
+  rows: number;
+  cols: number;
+  pieces: readonly PuzzlePieceSummary[] | null | undefined;
+}): AssemblyLayout | null {
+  const { widthMm, heightMm, rows, cols, pieces } = input;
+  if (!(widthMm > 0 && heightMm > 0) || !pieces?.length) return null;
+  const cells: AssemblyCell[] = pieces.map((piece) => {
+    const [x0, y0, x1, y1] = piece.bbox_mm;
+    const position = parsePuzzlePieceLabel(piece.label);
+    return {
+      label: piece.label,
+      exportName: `puzzle_${piece.label}`,
+      row: position?.row ?? 0,
+      col: position?.col ?? 0,
+      xMm: round2(x0),
+      yMm: round2(y0),
+      widthMm: round2(x1 - x0),
+      heightMm: round2(y1 - y0),
+      labelXMm: round2(piece.centroid_mm[0]),
+      labelYMm: round2(piece.centroid_mm[1]),
+    };
+  });
+  cells.sort((a, b) => a.row - b.row || a.col - b.col || a.label.localeCompare(b.label));
   return { kind: "puzzle", totalWidthMm: round2(widthMm), totalHeightMm: round2(heightMm), rows, cols, cells };
 }
 

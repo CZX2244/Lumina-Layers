@@ -15,7 +15,7 @@ import os
 import pickle
 import tempfile
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any
@@ -41,7 +41,7 @@ from api.schemas.converter import (
     PuzzleGenerateRequest,
     PuzzleLayoutPreviewRequest,
 )
-from api.schemas.responses import PuzzleGenerateResponse, PuzzleLayoutPreviewResponse
+from api.schemas.responses import PuzzleGenerateResponse, PuzzleLayoutPreviewResponse, PuzzlePieceSummary
 from api.selection_state import unpack_applied_region_mask
 from api.session_store import SessionStore
 from api.structured_logging import get_logger
@@ -328,6 +328,16 @@ def _get_mask_identity(mask_solid: np.ndarray | None) -> str | bytes:
         return "full-rect"
     packed = np.packbits(solid_mask, axis=None)
     return packed.tobytes()
+
+
+def _piece_summaries(pieces: Iterable[PuzzlePiece]) -> list[PuzzlePieceSummary]:
+    """Labels and mm geometry of the pieces, as named in the exported 3MF.
+    返回拼图块编号与毫米几何信息，与导出 3MF 中的名称一致。
+    """
+    return [
+        PuzzlePieceSummary(label=piece.label, bbox_mm=piece.bbox_mm, centroid_mm=piece.centroid_mm)
+        for piece in pieces
+    ]
 
 
 def _puzzle_footprint(cache: dict[str, Any]) -> np.ndarray | None:
@@ -879,6 +889,7 @@ async def puzzle_layout_preview(
         derived_piece_width_mm=layout.derived_piece_width_mm,
         derived_piece_height_mm=layout.derived_piece_height_mm,
         warnings=warnings,
+        pieces=_piece_summaries(layout.pieces),
     )
 
 
@@ -1553,6 +1564,7 @@ async def generate_puzzle(
         grid_cols=layout.cols,
         grid_rows=layout.rows,
         warnings=warnings,
+        pieces=_piece_summaries(piece for piece, *_rest in successful_entries),
         editor_content_revision=committed_content_revision,
         selection_revision=committed_selection_revision,
     )

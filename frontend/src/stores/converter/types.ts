@@ -28,6 +28,7 @@ import type {
   PaletteEntry,
   PerformanceTiming,
   PuzzleConnectorStyle,
+  PuzzlePieceSummary,
   PuzzleSizingMode,
   PuzzleStyle,
   RecipeHistoryItem,
@@ -335,6 +336,8 @@ export interface ConverterRuntimeState {
   puzzleResolvedRows: number | null;
   puzzleResolvedCols: number | null;
   puzzleResolvedPieceCount: number | null;
+  /** Pieces from the latest puzzle preview, replaced by the generated result. */
+  puzzlePieces: PuzzlePieceSummary[] | null;
   puzzleDerivedPieceWidthMm: number | null;
   puzzleDerivedPieceHeightMm: number | null;
 

@@ -279,6 +279,27 @@ def test_recipe_resampling_keeps_integer_values_on_the_rgb_sampling_grid(dtype, 
     assert np.array_equal(result, rgb_reference[..., None].astype(dtype) * 3 + np.arange(7, dtype=dtype) + offset)
 
 
+def test_layout_preview_reports_the_pieces_it_drew(puzzle_harness) -> None:
+    """Transparent cells drop out of the layout; the reported pieces follow the real layout."""
+    store = puzzle_harness["store"]
+    session_id = _seed_puzzle_preview_session(store)
+    cache = store.get(session_id)["preview_cache"]
+    cache["mask_solid"][:, 40:] = False  # Only the left third is printed.
+
+    response = puzzle_harness["client"].post("/api/convert/puzzle-layout-preview", json=_layout_preview_body(session_id))
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    labels = [piece["label"] for piece in body["pieces"]]
+    assert len(labels) == body["piece_count"] == len(set(labels))
+    assert 0 < len(labels) < 6, "cells with nothing printed are not pieces"
+    for piece in body["pieces"]:
+        x0, y0, x1, y1 = piece["bbox_mm"]
+        assert x0 < x1 and y0 < y1
+        assert x0 - 1e-6 <= piece["centroid_mm"][0] <= x1 + 1e-6
+        assert y0 - 1e-6 <= piece["centroid_mm"][1] <= y1 + 1e-6
+
+
 def test_layout_overlay_updates_when_the_backing_covers_a_color_gap(puzzle_harness, tmp_path) -> None:
     store = puzzle_harness["store"]
     session_id = _seed_puzzle_preview_session(store)
@@ -459,6 +480,17 @@ def test_puzzle_3mf_preserves_backing_only_regions_and_through_holes(
     assert surface_heights(7.71, 3.23) == pytest.approx(bare_piece_limits), "backing-only piece"
     assert surface_heights(2.51, 4.65) == pytest.approx(painted_limits), "red optical layers over white backing"
     assert response.json()["piece_count"] == 2
+    with ZipFile(path) as model:
+        exported = ElementTree.fromstring(model.read("3D/3dmodel.model"))
+    exported_names = {
+        obj.attrib["name"] for obj in exported.findall("{*}resources/{*}object") if obj.attrib.get("name")
+    }
+    reported = response.json()["pieces"]
+    assert {piece["label"] for piece in reported} == exported_names == {"A1", "A2"}, (
+        "the assembly sheet must number pieces exactly like the exported objects"
+    )
+    a1, a2 = sorted(reported, key=lambda piece: piece["label"])
+    assert a1["centroid_mm"][0] < a2["centroid_mm"][0], "A1 sits left of A2"
 
 
 class TestPuzzleLayoutPreviewCanary:

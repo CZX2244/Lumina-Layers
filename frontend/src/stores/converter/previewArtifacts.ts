@@ -8,6 +8,7 @@ import { normalizeResourceUrl } from "../../utils/resourceUrl";
 import { resolveVectorPreviewRenderer } from "../../utils/vectorPreviewRenderer";
 import { useSettingsStore } from "../settingsStore";
 import type { ConverterActions, ConverterState } from "./types";
+import type { PuzzlePieceSummary } from "../../api/types";
 
 const DEFAULT_PUZZLE_LAYOUT_SEED = 0;
 
@@ -65,6 +66,7 @@ export const DEFAULT_PUZZLE_PREVIEW_STATE = {
   puzzleResolvedRows: null,
   puzzleResolvedCols: null,
   puzzleResolvedPieceCount: null,
+  puzzlePieces: null as PuzzlePieceSummary[] | null,
   puzzleDerivedPieceWidthMm: null,
   puzzleDerivedPieceHeightMm: null,
 };

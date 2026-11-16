@@ -98,7 +98,7 @@ export async function renderAssemblySheet(
   }
   ctx.setLineDash([]);
 
-  // Labels at cell centres.
+  // Labels at piece centroids (puzzle) or cell centres (tiles).
   const labelSize = Math.max(14, Math.min(28, Math.floor(Math.min(...layout.cells.map((c) => c.widthMm * scale)) / 4)));
   ctx.font = `500 ${labelSize}px ${MONO}`;
   ctx.textAlign = "center";
@@ -108,8 +108,8 @@ export async function renderAssemblySheet(
       ctx.fillStyle = MISSING_SHADE;
       ctx.fillRect(artX + cell.xMm * scale, artY + cell.yMm * scale, cell.widthMm * scale, cell.heightMm * scale);
     }
-    const cx = artX + (cell.xMm + cell.widthMm / 2) * scale;
-    const cy = artY + (cell.yMm + cell.heightMm / 2) * scale;
+    const cx = artX + (cell.labelXMm ?? cell.xMm + cell.widthMm / 2) * scale;
+    const cy = artY + (cell.labelYMm ?? cell.yMm + cell.heightMm / 2) * scale;
     const boxW = ctx.measureText(cell.label).width + 16;
     const boxH = labelSize + 10;
     ctx.fillStyle = LABEL_FILL;

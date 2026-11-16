@@ -141,11 +141,12 @@ export const studioTranslations = {
 
   // Assembly reference sheet
   "studio.assembly.save": { zh: "保存装配参考图（{count} 块）", en: "Save assembly reference ({count} parts)" },
+  "studio.assembly.save_plain": { zh: "保存装配参考图", en: "Save assembly reference" },
   "studio.assembly.saving": { zh: "正在生成参考图…", en: "Drawing the reference…" },
   "studio.assembly.hint": { zh: "PNG 图上标出每一块的编号、位置和尺寸，编号和导出文件里的名字一致。", en: "A PNG showing each part's label, position and size; labels match the exported file names." },
   "studio.assembly.need_image": { zh: "先导入图片并生成预览，才能画参考图。", en: "Import an image and preview it first." },
   "studio.assembly.need_size": { zh: "分块尺寸无效。检查成品宽高和分块宽高都大于 0。", en: "The tile size is invalid. Check that the piece and tile sizes are above 0." },
-  "studio.assembly.need_puzzle_preview": { zh: "拼图布局还没算出来。先生成一次预览，拿到实际的行列数后再保存。", en: "The puzzle layout is not ready. Preview once to get the actual rows and columns, then save." },
+  "studio.assembly.need_puzzle_preview": { zh: "拼图布局还没算出来。先生成拼图预览，拿到实际的分块后再保存。", en: "The puzzle layout is not ready. Generate the puzzle preview to get the actual pieces, then save." },
   "studio.assembly.saved": { zh: "参考图已保存", en: "Reference saved" },
   "studio.assembly.failed": { zh: "参考图没有保存成功。预览图可能已过期，重新预览后再试。", en: "The reference could not be saved. The preview may be stale; preview again and retry." },
   "studio.assembly.title_tiles": { zh: "大画幅装配参考", en: "Large-format assembly reference" },

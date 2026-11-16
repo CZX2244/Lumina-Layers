@@ -773,6 +773,7 @@ export function restoreConverterRecipe(
     puzzleResolvedRows: null,
     puzzleResolvedCols: null,
     puzzleResolvedPieceCount: null,
+    puzzlePieces: null,
     puzzleDerivedPieceWidthMm: null,
     puzzleDerivedPieceHeightMm: null,
   };
