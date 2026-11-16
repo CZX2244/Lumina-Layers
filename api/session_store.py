@@ -97,6 +97,29 @@ class SessionStore:
             self._renew_lease_locked(session_id)
             return self._store[session_id]
 
+    def snapshot(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Return a shallow copy of the session taken under the store lock.
+        在存储锁内取 session 顶层字典的浅拷贝。
+
+        ``get()`` returns the live dict that background threads keep writing
+        (for example the visible-region cache prewarm). Copying that dict
+        while another thread adds a key raises "dictionary changed size during
+        iteration", so callers that copy the whole session start from this
+        snapshot instead. Values are shared, not copied.
+        ``get()`` 返回的是后台线程仍会写入的同一个字典；需要复制整个 session
+        时先取这份快照，避免复制中途被新增键打断。值本身不复制。
+        """
+        with self._lock:
+            self._prune_retired_locked()
+            if session_id in self._retired_sessions:
+                return None
+            if session_id not in self._store:
+                return None
+            if session_id in self._closing_sessions:
+                return None
+            self._renew_lease_locked(session_id)
+            return dict(self._store[session_id])
+
     def put(self, session_id: str, key: str, value: Any) -> None:
         """写入 session 数据字段。session 不存在时自动创建。"""
         with self._lock:

@@ -179,7 +179,7 @@ def _assert_editor_snapshot_current(
                 )
 
 
-def _snapshot_generation_session(session_data: dict) -> dict:
+def _snapshot_generation_session(session_data: dict, session_id: str = "") -> dict:
     """Deep-copy the session inputs used by a generation request.
 
     复制生成请求使用的会话输入，确保 worker 只读取本次生成绑定的快照。
@@ -187,11 +187,21 @@ def _snapshot_generation_session(session_data: dict) -> dict:
     Preview-cache artifact references remain cheap path metadata; legacy
     in-memory preview arrays are copied here so a later edit cannot mutate the
     arrays while a standard, large-format, or puzzle request is assembling its
-    worker inputs.
+    worker inputs. Pass a ``SessionStore.snapshot()`` copy, not the live dict:
+    background threads may add keys to the live dict during the copy.
     """
     try:
         return deepcopy(session_data)
     except (OSError, TypeError, ValueError, RuntimeError) as exc:
+        log.warning(
+            "Generation inputs could not be copied",
+            extra={
+                "event": "generation_snapshot_failed",
+                "session_id": session_id,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            },
+        )
         raise HTTPException(
             status_code=409,
             detail=(
@@ -241,8 +251,15 @@ def _capture_generation_snapshot(
                         "refresh the selection and try again."
                     ),
                 )
+            # Copy from a snapshot taken under the store lock: background
+            # threads (e.g. the visible-region cache prewarm after a preview)
+            # add keys to the live dict without the editor locks.
+            # 先在存储锁内取浅拷贝再深拷贝，避免后台线程新增键打断复制。
+            stable_session_data = store.snapshot(session_id)
+            if stable_session_data is None:
+                raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
             return (
-                _snapshot_generation_session(live_session_data),
+                _snapshot_generation_session(stable_session_data, session_id),
                 committed_revision,
                 selection_revision,
             )
