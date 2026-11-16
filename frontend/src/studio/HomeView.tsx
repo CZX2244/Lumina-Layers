@@ -112,7 +112,10 @@ function FirstRunChecklist() {
               <SmallButton testId="studio-path-builtin" label={t("studio.home.path_builtin")} onClick={() => {
                 if (useConverterStore.getState().source_version !== "legacy") setSourceVersion("legacy");
                 goToWorkbenchStep("color");
-                void clickStudioControlWhenReady('[data-testid="lut-picker-trigger"]');
+                // The built-in catalogue can take longer than 8 s on a brand-new
+                // data folder; wait for it unless the user moves on first.
+                // 全新数据目录首次加载内置目录可能超过 8 秒：等它加载完，用户有别的操作就不再弹出。
+                void clickStudioControlWhenReady('[data-testid="lut-picker-trigger"]', { timeoutMs: 60000, cancelOnUserInput: true });
               }} />
               <SmallButton testId="studio-path-import" label={t("studio.home.path_import")} onClick={() => navigateStudio("lut-library")} />
               <SmallButton testId="studio-path-calibrate" label={t("studio.home.path_calibrate")} onClick={() => navigateStudio("gradient-card-generate")} />

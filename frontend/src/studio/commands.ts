@@ -41,16 +41,36 @@ export function clickStudioControl(selector: string): boolean {
   return true;
 }
 
+export interface WhenReadyOptions {
+  /** Give up after this long (ms). */
+  timeoutMs?: number;
+  /** Give up as soon as the user presses a key or clicks anywhere: they moved on. */
+  cancelOnUserInput?: boolean;
+}
+
 /**
  * Click a control once it exists and is enabled (e.g. a picker that is
- * disabled while its catalogue loads). Gives up after `timeoutMs`.
+ * disabled while its catalogue loads). Resolves false when it gives up.
+ * 等控件出现且可用后再点（例如目录加载中被禁用的选择器）；放弃时返回 false。
  */
-export function clickStudioControlWhenReady(selector: string, timeoutMs = 8000): Promise<boolean> {
+export function clickStudioControlWhenReady(selector: string, { timeoutMs = 8000, cancelOnUserInput = false }: WhenReadyOptions = {}): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve) => {
+    let cancelled = false;
+    const cancel = () => { cancelled = true; };
+    const stopListening = () => {
+      window.removeEventListener("pointerdown", cancel, true);
+      window.removeEventListener("keydown", cancel, true);
+    };
+    if (cancelOnUserInput) {
+      window.addEventListener("pointerdown", cancel, true);
+      window.addEventListener("keydown", cancel, true);
+    }
+    const finish = (clicked: boolean) => { stopListening(); resolve(clicked); };
     const attempt = () => {
-      if (clickStudioControl(selector)) return resolve(true);
-      if (Date.now() > deadline) return resolve(false);
+      if (cancelled) return finish(false);
+      if (clickStudioControl(selector)) return finish(true);
+      if (Date.now() > deadline) return finish(false);
       window.setTimeout(attempt, 150);
     };
     attempt();
