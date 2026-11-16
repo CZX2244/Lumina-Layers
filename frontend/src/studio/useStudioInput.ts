@@ -35,7 +35,7 @@ export function namePastedImage(file: File, now: Date = new Date()): File {
 function openImagesInConverter(files: File[]): void {
   navigateStudio("converter");
   if (useWidgetStore.getState().activeConverterSubTab === "color") useWidgetStore.getState().setActiveConverterSubTab("core");
-  useConverterStore.getState().handleFilesSelect(files);
+  void useConverterStore.getState().importImageFiles(files);
 }
 
 /** Whether a modal dialog (other than the browser's own) currently has focus. */

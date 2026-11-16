@@ -7156,6 +7156,18 @@ export const translations: Record<string, Record<"zh" | "en", string>> = {
     zh: "（图片支持多选）",
     en: "(images support multi-select)",
   },
+  import_trim_notice: {
+    zh: "已去掉四周透明边：{from} → {to} 像素，尺寸按有内容的部分计算。",
+    en: "Removed transparent margins: {from} → {to} px. Sizes now measure the visible content.",
+  },
+  import_trim_restore: {
+    zh: "恢复原图（保留透明边）",
+    en: "Restore original (keep margins)",
+  },
+  import_trim_restored_for_surface: {
+    zh: "模型贴图使用原图（保留透明边），贴图位置和比例按原图计算。",
+    en: "Model texturing uses the original image with its transparent margins.",
+  },
   upload_tap_to_change: {
     zh: "点击更换或追加",
     en: "Change or add",

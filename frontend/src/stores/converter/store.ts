@@ -97,6 +97,7 @@ import {
   computeAutoHeightMap
 } from "../../utils/colorUtils";
 import { rememberDerivedImageSource, resolveSourceFile } from "../../utils/sourceFileOrigins";
+import { trimTransparentMargins, type TrimResult } from "../../utils/trimTransparentMargins";
 import {
   autoLayoutFridgeMagnets,
   buildSuggestedFridgeMagnetCenters,
@@ -1909,6 +1910,7 @@ export const DEFAULT_STATE: ConverterState = {
   aspectRatio: null,
   preferredSizeAxis: "width",
   conversionParameterContext: "defaults",
+  importTrim: null,
   workshopSource: null,
   modelSurfaceEnabled: false,
   modelSurfaceFile: null,
@@ -2356,6 +2358,13 @@ async function navigateEditorHistory(
   }
 }
 
+/** Trim one imported image and remember the untrimmed upload behind it. */
+async function trimImportedImage(file: File): Promise<TrimResult> {
+  const result = await trimTransparentMargins(file);
+  if (result.trim) rememberDerivedImageSource(result.file, file);
+  return result;
+}
+
 const documentCommand = createDocumentCommandWrapper((action, blocked, options) =>
   converterDocumentHistory.run(action, blocked, options));
 
@@ -2671,6 +2680,7 @@ export const useConverterStore = create<ConverterState & ConverterActions>()(
     }),
 
     setModelSurfaceEnabled: documentCommand((enabled: boolean) => {
+      if (enabled) restoreOriginalForModelSurface();
       set((state) => ({
         modelSurfaceEnabled: enabled,
         backing_infill_density_percent: enabled
@@ -2685,6 +2695,7 @@ export const useConverterStore = create<ConverterState & ConverterActions>()(
     }),
 
     uploadModelSurfaceFile: documentCommand(async (file: File) => {
+      restoreOriginalForModelSurface();
       const currentState = _get();
       const prev = currentState.modelSurfacePreviewUrl;
       if (prev && prev.startsWith("blob:")) {
@@ -7488,6 +7499,42 @@ export const useConverterStore = create<ConverterState & ConverterActions>()(
       });
     }),
 
+    importImageFiles: async (files: File[]) => {
+      const valid = files.filter((file) => file && isValidImageType(file.type, file.name));
+      if (!valid.length) return;
+      // Model texturing keeps the original canvas: transparent space places the artwork.
+      if (_get().modelSurfaceEnabled) {
+        _get().handleFilesSelect(valid);
+        return;
+      }
+      const results = await Promise.all(valid.map(trimImportedImage));
+      _get().handleFilesSelect(results.map((result) => result.file));
+      const [only] = results;
+      if (results.length === 1 && only.trim && _get().imageFile === only.file) {
+        set({ importTrim: { kind: "trimmed", file: only.file, original: valid[0], ...only.trim } });
+      }
+    },
+
+    replaceImageFile: async (file: File) => {
+      if (!isValidImageType(file.type, file.name)) return;
+      if (_get().modelSurfaceEnabled) {
+        _get().setImageFile(file);
+        return;
+      }
+      const result = await trimImportedImage(file);
+      _get().setImageFile(result.file);
+      if (result.trim && _get().imageFile === result.file) {
+        set({ importTrim: { kind: "trimmed", file: result.file, original: file, ...result.trim } });
+      }
+    },
+
+    restoreUntrimmedImage: () => {
+      const trim = _get().importTrim;
+      if (!trim || trim.kind !== "trimmed" || _get().imageFile !== trim.file) return;
+      _get().setImageFile(trim.original);
+      set({ cropModalOpen: false, importTrim: null });
+    },
+
     handleFilesSelect: documentCommand((files: File[]) => {
       // Filter out falsy values and invalid formats
       const validFiles = files.filter(
@@ -8198,3 +8245,18 @@ registerPreviewArtifactInvalidator(() => {
     buildPreviewSessionResetState(useConverterStore.getState()),
   );
 });
+
+/**
+ * Model texturing works on the original canvas (transparent space positions
+ * the artwork). When it is switched on while the current image is still the
+ * untouched auto-trimmed import, go back to the original upload first — before
+ * the surface is enabled, so the texture placement is not reset.
+ * 开启模型贴图时，若当前图片仍是自动裁过透明边的那张，先换回原图（在开启前换，避免重置贴图位置）。
+ */
+function restoreOriginalForModelSurface(): void {
+  const state = useConverterStore.getState();
+  const trim = state.importTrim;
+  if (state.modelSurfaceEnabled || !trim || trim.kind !== "trimmed" || state.imageFile !== trim.file) return;
+  state.setImageFile(trim.original);
+  useConverterStore.setState({ cropModalOpen: false, importTrim: { ...trim, kind: "restored-for-surface", file: trim.original } });
+}

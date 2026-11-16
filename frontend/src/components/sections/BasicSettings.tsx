@@ -497,8 +497,12 @@ export default function BasicSettings() {
   }, [imageFile]);
 
   // Action 函数单独提取（函数引用稳定，不需要 shallow）
-  const handleFilesSelect = useConverterStore((s) => s.handleFilesSelect);
-  const setImageFile = useConverterStore((s) => s.setImageFile);
+  // Normal image conversion trims transparent margins on import (personal build).
+  const importImageFiles = useConverterStore((s) => s.importImageFiles);
+  const replaceImageFile = useConverterStore((s) => s.replaceImageFile);
+  const restoreUntrimmedImage = useConverterStore((s) => s.restoreUntrimmedImage);
+  const importTrim = useConverterStore((s) => s.importTrim);
+  const handleFilesSelect = useCallback((files: File[]) => { void importImageFiles(files); }, [importImageFiles]);
   const setLutName = useConverterStore((s) => s.setLutName);
   useEffect(() => {
     if (source_version === "native" || (
@@ -535,9 +539,9 @@ export default function BasicSettings() {
   const handleFileReplace = useCallback(
     (file: File) => {
       if (!isValidImageType(file.type, file.name)) return;
-      setImageFile(file);
+      void replaceImageFile(file);
     },
-    [setImageFile],
+    [replaceImageFile],
   );
 
   const sourceVersionOptions = [
@@ -1139,6 +1143,23 @@ export default function BasicSettings() {
               {t("upload_tap_to_change")}
             </span>
           </button>
+        )}
+
+        {importTrim && importTrim.file === imageFile && (
+          <p role="status" data-testid="import-trim-notice" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-[var(--surface-text-muted)]">
+            <span>
+              {importTrim.kind === "trimmed"
+                ? t("import_trim_notice")
+                  .replace("{from}", `${importTrim.fromWidth}×${importTrim.fromHeight}`)
+                  .replace("{to}", `${importTrim.toWidth}×${importTrim.toHeight}`)
+                : t("import_trim_restored_for_surface")}
+            </span>
+            {importTrim.kind === "trimmed" && (
+              <button type="button" onClick={restoreUntrimmedImage} className="font-medium text-[var(--nav-tab-selected-bg)] underline-offset-2 hover:underline">
+                {t("import_trim_restore")}
+              </button>
+            )}
+          </p>
         )}
 
         {workshopSource ? (

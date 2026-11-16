@@ -68,6 +68,7 @@ function isInsideLocalFileDropZone(target: EventTarget | null): boolean {
 export function useConverterDropRouting(): { dropImportIntent: ConverterDropImportIntent | null } {
   const [dropImportIntent, setDropImportIntent] = useState<ConverterDropImportIntent | null>(null);
   const handleFilesSelect = useConverterStore((s) => s.handleFilesSelect);
+  const importImageFiles = useConverterStore((s) => s.importImageFiles);
   const uploadModelSurfaceFile = useConverterStore((s) => s.uploadModelSurfaceFile);
 
   const importDroppedFiles = useCallback(
@@ -80,14 +81,16 @@ export function useConverterDropRouting(): { dropImportIntent: ConverterDropImpo
       }
 
       if (imageFiles.length > 0) {
-        handleFilesSelect(imageFiles);
+        // A model dropped together with the image is a texturing job: keep the original canvas.
+        if (modelFile) handleFilesSelect(imageFiles);
+        else void importImageFiles(imageFiles);
       }
       if (modelFile) {
         void uploadModelSurfaceFile(modelFile);
       }
       return true;
     },
-    [handleFilesSelect, uploadModelSurfaceFile],
+    [handleFilesSelect, importImageFiles, uploadModelSurfaceFile],
   );
 
   const handleDroppedFiles = useCallback(

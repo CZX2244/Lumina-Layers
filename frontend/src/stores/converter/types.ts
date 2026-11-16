@@ -103,6 +103,18 @@ export type RemapSnapshot = Record<string, string>;
 
 export type ModelSurfacePlacementMode = "edge_to_edge" | "inset";
 
+/** Automatic transparent-margin trim applied when an image was imported. */
+export interface ImportTrimState {
+  /** "trimmed": `file` is the trimmed image; "restored-for-surface": model texturing switched back to `original`. */
+  kind: "trimmed" | "restored-for-surface";
+  file: File;
+  original: File;
+  fromWidth: number;
+  fromHeight: number;
+  toWidth: number;
+  toHeight: number;
+}
+
 export interface ModelSurfacePlacement {
   mode: ModelSurfacePlacementMode;
   offset_x_mm: number;
@@ -274,6 +286,11 @@ export interface ConverterViewState {
 }
 
 export interface ConverterRuntimeState {
+  /**
+   * Last automatic margin trim on import (personal build). Shown only while
+   * `file` is still the current image; `original` is the untrimmed upload.
+   */
+  importTrim: ImportTrimState | null;
   nativeMaterialSelection: ExportMaterialSelection | null;
   nativeMaterialSelectionAction: NativeMaterialSelectionAction | null;
   nativeMaterialSelectionLoading: boolean;
@@ -927,6 +944,12 @@ export interface ConverterActions {
 
   // 统一文件选择（auto-batch-multiselect）
   handleFilesSelect: (files: File[]) => void;
+  /** Normal image-conversion import: trims transparent margins (not for model texturing). */
+  importImageFiles: (files: File[]) => Promise<void>;
+  /** Replace the current image through the same import step. */
+  replaceImageFile: (file: File) => Promise<void>;
+  /** Go back to the untrimmed upload behind the current auto-trimmed image. */
+  restoreUntrimmedImage: () => void;
 
   // 颜色替换预览
   submitReplacePreview: () => Promise<void>;
