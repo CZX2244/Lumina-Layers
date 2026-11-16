@@ -97,8 +97,9 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     sizeMm: 400,
     apply: (state, { bedWidthMm, bedHeightMm }) => {
       resetProductFeatures(state);
-      setLongEdge(state, 400);
+      // Enable large format first: until then the size is clamped to the bed.
       state.setLargeFormatEnabled(true);
+      setLongEdge(state, 400);
       // Leave room on the plate for a wipe tower / brim.
       if (bedWidthMm && bedHeightMm) {
         state.setTileWidthMm(Math.max(50, Math.floor(bedWidthMm - 20)));

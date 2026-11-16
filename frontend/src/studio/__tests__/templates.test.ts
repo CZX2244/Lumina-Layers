@@ -30,3 +30,26 @@ describe("preset files", () => {
     expect(() => mergeImportedPresets([], JSON.stringify({ hello: 1 }))).toThrow("no-presets");
   });
 });
+
+describe("product templates", () => {
+  it("large format really gets the 400 mm long edge, with tiles 20 mm inside the bed", async () => {
+    const { applyProductTemplate, PRODUCT_TEMPLATES } = await import("../templates/templateRegistry");
+    const template = PRODUCT_TEMPLATES.find((item) => item.id === "large-format")!;
+    useConverterStore.setState({
+      aspectRatio: 1,
+      largeFormatEnabled: false,
+      puzzleEnabled: false,
+      enable_fridge_magnet: false,
+      bedSizes: [{ label: "Test bed", width_mm: 350, height_mm: 320 } as never],
+      bed_label: "Test bed",
+    });
+
+    applyProductTemplate(template);
+
+    const state = useConverterStore.getState();
+    expect(state.largeFormatEnabled).toBe(true);
+    expect(Math.max(state.target_width_mm, state.target_height_mm ?? 0)).toBe(400);
+    expect(state.tileWidthMm).toBe(330);
+    expect(state.tileHeightMm).toBe(300);
+  });
+});
