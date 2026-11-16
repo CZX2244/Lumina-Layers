@@ -196,7 +196,10 @@ class TestVectorizeRouteNonAsciiTempDir:
             )
             assert response.status_code == 200, response.text
             body = response.json()
-            assert (body["width"], body["height"]) == (64, 32)
+            # The JPEG carries EXIF orientation 6: it is vectorized upright,
+            # the way browsers display it (stored 64x32, shown 32x64).
+            expected = (32, 64) if fmt == "JPEG" else (64, 32)
+            assert (body["width"], body["height"]) == expected
             svg = client.get(body["svg_url"])
             assert svg.status_code == 200
             assert b"<svg" in svg.content
